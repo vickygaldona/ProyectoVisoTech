@@ -566,9 +566,16 @@ const OriginButton = React.forwardRef<HTMLButtonElement, OriginButtonProps>(
 
     const idleClasses =
       variant === "solid"
-        ? "border-white/10 bg-white text-neutral-950"
-        : "border-white/25 bg-transparent text-white";
-    const activeTextClasses = variant === "solid" ? "text-white" : "text-neutral-950";
+        ? "border-white/10 bg-white"
+        : "border-white/25 bg-transparent";
+    const textClasses =
+      variant === "solid"
+        ? showFill
+          ? "text-white"
+          : "text-neutral-950"
+        : showFill
+          ? "text-neutral-950"
+          : "text-white";
     const fillClasses = variant === "solid" ? "bg-neutral-950" : "bg-white";
     const sizeClasses =
       size === "xl"
@@ -586,7 +593,7 @@ const OriginButton = React.forwardRef<HTMLButtonElement, OriginButtonProps>(
           "disabled:pointer-events-none disabled:opacity-50",
           sizeClasses,
           idleClasses,
-          showFill && activeTextClasses,
+          textClasses,
           className,
         )}
         data-pressed={isPressed ? "true" : "false"}
@@ -969,6 +976,7 @@ type Slide = {
   title?: string;
   caption?: string;
   alt?: string;
+  href?: string;
   palette?: LandPalette;
   seed?: number;
 };
@@ -1163,43 +1171,45 @@ function paintLandscape(
   return c.toDataURL("image/jpeg", 0.88);
 }
 
-const U = (id: string) =>
-  "https://images.unsplash.com/photo-" +
-  id +
-  "?q=80&w=1400&auto=format&fit=crop";
+const shot = (url: string) =>
+  "https://image.thum.io/get/width/1000/crop/1333/noanimate/" + url;
 
 const DEMO_SLIDES: Slide[] = [
   {
-    image: U("1506784983877-45594efa4cbe"),
-    title: "Sistema de Turnos para Consultorios",
-    caption: "Agenda online, reservas y recordatorios en un solo lugar.",
-    alt: "Agenda y calendario de turnos",
-    palette: "alpine",
-    seed: 8,
-  },
-  {
-    image: U("1542291026-7eec264c27ff"),
-    title: "E-commerce Deportivo",
-    caption: "Catálogo, carrito y pagos para tu tienda.",
-    alt: "Zapatilla deportiva roja",
-    palette: "dusk",
-    seed: 14,
-  },
-  {
-    image: U("1513151233558-d860c5398176"),
-    title: "Invitaciones Digitales",
-    caption: "Eventos con confirmación de asistencia y ubicación.",
-    alt: "Celebración con confeti",
+    image: shot("https://carnetmanipulacionalimentos.netlify.app"),
+    href: "https://carnetmanipulacionalimentos.netlify.app",
+    title: "Carnet de Manipulación de Alimentos",
+    caption: "Landing de curso de certificación en San Rafael.",
+    alt: "Captura de la landing del Carnet de Manipulación de Alimentos",
     palette: "dawn",
     seed: 3,
   },
   {
-    image: U("1488646953014-85cb44e25828"),
-    title: "Agencias de Viajes",
-    caption: "Paquetes, consultas y reservas directo por WhatsApp.",
-    alt: "Mapa y objetos de viaje",
+    image: shot("https://www.carolinagarcia.com.ar"),
+    href: "https://www.carolinagarcia.com.ar",
+    title: "Carolina García",
+    caption: "Sitio web profesional.",
+    alt: "Captura del sitio de Carolina García",
     palette: "mist",
     seed: 21,
+  },
+  {
+    image: shot("https://danger-fitness-web.netlify.app"),
+    href: "https://danger-fitness-web.netlify.app",
+    title: "Danger Fitness",
+    caption: "Sitio web de entrenamiento.",
+    alt: "Captura del sitio de Danger Fitness",
+    palette: "dusk",
+    seed: 14,
+  },
+  {
+    image: shot("https://bautismo-lian.netlify.app"),
+    href: "https://bautismo-lian.netlify.app",
+    title: "Invitación de Bautismo",
+    caption: "Invitación digital para eventos.",
+    alt: "Captura de la invitación digital de bautismo",
+    palette: "alpine",
+    seed: 8,
   },
 ];
 
@@ -1547,6 +1557,16 @@ const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
           </svg>
         </button>
       </div>
+      {s.href ? (
+        <MagneticWrap>
+          <OriginButton
+            variant="outline"
+            onClick={() => window.open(s.href, "_blank", "noopener,noreferrer")}
+          >
+            Ver demo ↗
+          </OriginButton>
+        </MagneticWrap>
+      ) : null}
       <div className="cd-sr" aria-live="polite">
         {"Tarjeta " + (top + 1) + " de " + n + (s.title ? ": " + s.title : "")}
       </div>
@@ -1562,7 +1582,11 @@ const MagneticWrap: React.FC<{ children: React.ReactNode; className?: string }> 
   children,
   className,
 }) => (
-  <span data-magnetic className={cn("inline-block rounded-xl", className)}>
+  <span
+    data-magnetic
+    data-magnetic-color="rgba(255,255,255,0.12)"
+    className={cn("inline-block rounded-xl", className)}
+  >
     {children}
   </span>
 );
@@ -1726,6 +1750,7 @@ const Portfolio: React.FC = () => (
         cardWidth="min(78vw, 400px)"
         aspect="3 / 4"
         scatter={8}
+        autoplay={0}
         background="transparent"
         ink="#f4f4f5"
       />
