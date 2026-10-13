@@ -3,58 +3,132 @@
 /* eslint-disable @next/next/no-img-element */
 // Dependencias: npm i gsap vecteur lucide-react framer-motion
 // Requiere: Next.js (App Router) + TypeScript + Tailwind CSS 4
+// Imágenes del portfolio: public/imagen1.png ... public/imagen4.png
 
 import * as React from "react";
 import gsap from "gsap";
-import { vec2, type Vec2 } from "vecteur";
-import { motion, type Variants } from "framer-motion";
+import { vec2 } from "vecteur";
+import { motion, MotionConfig, type Variants } from "framer-motion";
 import {
   Home,
   LayoutGrid,
   Layers,
   MessageCircle,
   Rocket,
-  ShoppingBag,
-  CalendarCheck,
+  Utensils,
+  PartyPopper,
   Sparkles,
+  Users,
+  Check,
+  X,
+  Zap,
+  GraduationCap,
+  SlidersHorizontal,
 } from "lucide-react";
 
 /* ============================================================
-   CONSTANTES GLOBALES
+   CONTACTOS Y HELPERS GLOBALES
    ============================================================ */
 
-const WA_NUMBER = "549TU_NUMERO_ACA";
-const WA_MESSAGE =
-  "Hola VisoTech! Quiero consultar por un sitio web para mi negocio.";
+type ContactId = "santiago" | "victoria";
 
-const waLink = (message: string = WA_MESSAGE) =>
-  `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(message)}`;
+type Contact = {
+  id: ContactId;
+  name: string;
+  /** Formato internacional de Argentina para WhatsApp: 54 + 9 + código de área + número */
+  number: string;
+  graduate: string;
+  initial: string;
+};
 
-const openWhatsApp = (message?: string) => {
-  window.open(waLink(message), "_blank", "noopener,noreferrer");
+const CONTACTS: readonly Contact[] = [
+  {
+    id: "santiago",
+    name: "Santiago",
+    number: "5492625649736",
+    graduate: "Egresado",
+    initial: "S",
+  },
+  {
+    id: "victoria",
+    name: "Victoria",
+    number: "5492604811080",
+    graduate: "Egresada",
+    initial: "V",
+  },
+];
+
+const getContact = (id: ContactId): Contact =>
+  CONTACTS.find((c) => c.id === id) ?? CONTACTS[0];
+
+const DEFAULT_TOPIC = "un sitio web para mi negocio";
+
+const waLink = (id: ContactId, topic: string = DEFAULT_TOPIC) => {
+  const { name, number } = getContact(id);
+  const message = `Hola ${name}! Escribo desde la web de VisoTech. Quiero consultar por ${topic}.`;
+  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+};
+
+const openWhatsApp = (id: ContactId, topic?: string) => {
+  window.open(waLink(id, topic), "_blank", "noopener,noreferrer");
 };
 
 const goTo = (id: string) => {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   document
     .getElementById(id)
-    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    ?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
 };
 
 const cn = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(" ");
+
+const focusRing =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
 
 const GLOBAL_CSS = `
 :root{--aurora-color1:rgba(168,85,247,0.2);--aurora-color2:rgba(79,70,229,0.2)}
 html{scroll-behavior:smooth;background:#000}
 @keyframes vt-pulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:.7;transform:scale(1.05)}}
 @keyframes vt-wave{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+@keyframes vt-twinkle{0%,100%{opacity:0}50%{opacity:var(--peak,.6)}}
+.vt-pulse{animation:vt-pulse var(--vt-dur,10s) infinite}
+.vt-star{opacity:0;animation:vt-twinkle var(--vt-dur,3s) ease-in-out var(--vt-delay,0s) infinite}
+.vt-wave-a{animation:vt-wave 40s linear infinite reverse;will-change:transform}
+.vt-wave-b{animation:vt-wave 28s linear infinite;will-change:transform}
+.vt-paused,.vt-paused *{animation-play-state:paused !important}
 html.vt-cursor,html.vt-cursor *{cursor:none !important}
-@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .vt-pulse,.vt-wave-a,.vt-wave-b{animation:none}
+  .vt-star{animation:none;opacity:.35}
+}
 `;
+
+/** Observa si un elemento está en pantalla (para pausar animaciones costosas). */
+function useInView<T extends Element>(rootMargin = "120px") {
+  const ref = React.useRef<T | null>(null);
+  const [inView, setInView] = React.useState(true);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting),
+      { rootMargin },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [rootMargin]);
+
+  return [ref, inView] as const;
+}
 
 /* ============================================================
    MAGNETIC CURSOR
    ============================================================ */
+
+type Vec2 = ReturnType<typeof vec2>;
 
 interface MagneticCursorProps {
   children: React.ReactNode;
@@ -104,7 +178,12 @@ const MagneticCursor: React.FC<MagneticCursorProps> = ({
 }) => {
   const cursorRef = React.useRef<HTMLDivElement>(null);
   const cursorStateRef = React.useRef<CursorState | null>(null);
-  const [isTouchDevice, setIsTouchDevice] = React.useState(false);
+  // "pending" hasta saber qué tipo de dispositivo es: evita activar el cursor
+  // (y ocultar el puntero) un instante en pantallas táctiles.
+  const [mode, setMode] = React.useState<"pending" | "touch" | "pointer">(
+    "pending",
+  );
+  const active = mode !== "pending" && !(disableOnTouch && mode === "touch");
 
   const configRef = React.useRef({
     magneticFactor,
@@ -137,11 +216,12 @@ const MagneticCursor: React.FC<MagneticCursorProps> = ({
   ]);
 
   React.useEffect(() => {
-    setIsTouchDevice("ontouchstart" in window || navigator.maxTouchPoints > 0);
+    const isTouch = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+    setMode(isTouch ? "touch" : "pointer");
   }, []);
 
   React.useEffect(() => {
-    if (disableOnTouch && isTouchDevice) return;
+    if (!active) return;
     const cursorEl = cursorRef.current;
     if (!cursorEl) return;
 
@@ -166,6 +246,9 @@ const MagneticCursor: React.FC<MagneticCursorProps> = ({
       };
     }
 
+    // Cuando el cursor está quieto no hace falta volver a escribir en el DOM en cada frame.
+    let idle = false;
+
     const update = () => {
       const state = cursorStateRef.current;
       if (!state || state.hover.isHovered) return;
@@ -177,6 +260,17 @@ const MagneticCursor: React.FC<MagneticCursorProps> = ({
       state.pos.current.lerp(state.pos.target, effectiveLerp);
       const delta = state.pos.current.clone().sub(state.pos.previous);
       state.pos.previous.copy(state.pos.current);
+
+      if (
+        !state.isDetaching &&
+        Math.abs(delta.x) < 0.01 &&
+        Math.abs(delta.y) < 0.01
+      ) {
+        if (idle) return;
+        idle = true;
+      } else {
+        idle = false;
+      }
 
       if (state.isDetaching) {
         gsap.set(state.el, {
@@ -305,7 +399,7 @@ const MagneticCursor: React.FC<MagneticCursorProps> = ({
           rotate: 0,
           duration: 0.3,
           ease: "power3.out",
-          overwrite: "all",
+          overwrite: true,
         });
       };
 
@@ -337,7 +431,7 @@ const MagneticCursor: React.FC<MagneticCursorProps> = ({
           scaleY: 1,
           duration: detachDuration,
           ease: "power3.out",
-          overwrite: "all",
+          overwrite: true,
           onComplete: () => {
             state.isDetaching = false;
           },
@@ -372,6 +466,7 @@ const MagneticCursor: React.FC<MagneticCursorProps> = ({
         el.removeEventListener("pointerleave", handlePointerLeave);
         el.removeEventListener("pointermove", handlePointerMove);
         el.removeEventListener("pointerout", handlePointerOut);
+        if (rafId) cancelAnimationFrame(rafId);
       });
     });
 
@@ -379,20 +474,12 @@ const MagneticCursor: React.FC<MagneticCursorProps> = ({
       document.documentElement.classList.remove("vt-cursor");
       gsap.ticker.remove(update);
       window.removeEventListener("pointermove", onMouseMove);
+      window.removeEventListener("pointermove", initializePosition);
       document.removeEventListener("mouseleave", handleMouseLeave);
       document.removeEventListener("mouseenter", handleMouseEnter);
       cleanupFunctions.forEach((cleanup) => cleanup());
     };
-  }, [
-    disableOnTouch,
-    isTouchDevice,
-    hoverPadding,
-    hoverAttribute,
-    cursorColor,
-    shape,
-  ]);
-
-  if (disableOnTouch && isTouchDevice) return <>{children}</>;
+  }, [active, hoverAttribute, cursorColor, shape]);
 
   const styles: React.CSSProperties = {
     position: "fixed",
@@ -412,14 +499,18 @@ const MagneticCursor: React.FC<MagneticCursorProps> = ({
       contrastBoost !== 1 ? `contrast(${contrastBoost})` : "none",
   };
 
+  // El slot del cursor siempre existe (null cuando está inactivo) para que
+  // `children` no se remonte al cambiar de modo.
   return (
     <>
-      <div
-        ref={cursorRef}
-        className={`magnetic-cursor ${cursorClassName}`}
-        style={styles}
-        aria-hidden="true"
-      />
+      {active ? (
+        <div
+          ref={cursorRef}
+          className={`magnetic-cursor ${cursorClassName}`}
+          style={styles}
+          aria-hidden="true"
+        />
+      ) : null}
       {children}
     </>
   );
@@ -451,7 +542,7 @@ type OriginButtonProps = ButtonNativeProps & {
   children?: React.ReactNode;
   loading?: boolean;
   variant?: "solid" | "outline";
-  size?: "md" | "xl";
+  size?: "md" | "lg" | "xl";
 };
 
 function getCoverDiameter(width: number, height: number, x: number, y: number) {
@@ -580,7 +671,9 @@ const OriginButton = React.forwardRef<HTMLButtonElement, OriginButtonProps>(
     const sizeClasses =
       size === "xl"
         ? "h-16 px-10 text-lg md:h-20 md:px-14 md:text-xl"
-        : "h-12 px-8 text-[15px]";
+        : size === "lg"
+          ? "h-14 px-8 text-base md:h-16 md:px-10 md:text-lg"
+          : "h-12 px-8 text-[15px]";
 
     return (
       <motion.button
@@ -589,7 +682,7 @@ const OriginButton = React.forwardRef<HTMLButtonElement, OriginButtonProps>(
         className={cn(
           "relative inline-flex touch-manipulation select-none items-center justify-center overflow-hidden rounded-xl border font-medium tracking-[-0.02em]",
           "transition-colors duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+          focusRing,
           "disabled:pointer-events-none disabled:opacity-50",
           sizeClasses,
           idleClasses,
@@ -697,6 +790,19 @@ const OriginButton = React.forwardRef<HTMLButtonElement, OriginButtonProps>(
 );
 OriginButton.displayName = "OriginButton";
 
+const MagneticWrap: React.FC<{ children: React.ReactNode; className?: string }> = ({
+  children,
+  className,
+}) => (
+  <span
+    data-magnetic
+    data-magnetic-color="rgba(255,255,255,0.12)"
+    className={cn("inline-block rounded-xl", className)}
+  >
+    {children}
+  </span>
+);
+
 /* ============================================================
    AURORA BACKGROUND
    ============================================================ */
@@ -714,7 +820,7 @@ type Star = { x: number; y: number; peak: number; dur: number; delay: number };
 const AuroraBackground: React.FC<AuroraBackgroundProps> = ({
   className = "",
   children,
-  starCount = 50,
+  starCount = 24,
   gradientColors = [
     "var(--aurora-color1, rgba(168,85,247,0.2))",
     "var(--aurora-color2, rgba(79,70,229,0.2))",
@@ -723,13 +829,14 @@ const AuroraBackground: React.FC<AuroraBackgroundProps> = ({
 }) => {
   const [colorA, colorB] = gradientColors;
   const [stars, setStars] = React.useState<Star[]>([]);
+  const [rootRef, inView] = useInView<HTMLDivElement>();
 
   React.useEffect(() => {
     setStars(
       Array.from({ length: starCount }).map(() => ({
         x: Math.random() * 100,
         y: Math.random() * 100,
-        peak: Math.random() * 0.8,
+        peak: 0.25 + Math.random() * 0.6,
         dur: Math.random() * 3 + 2,
         delay: Math.random() * 5,
       })),
@@ -738,71 +845,82 @@ const AuroraBackground: React.FC<AuroraBackgroundProps> = ({
 
   return (
     <div
-      className={`relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-black text-slate-50 ${className}`}
+      ref={rootRef}
+      className={cn(
+        "relative flex min-h-svh w-full flex-col items-center justify-center overflow-hidden bg-black text-slate-50",
+        !inView && "vt-paused",
+        className,
+      )}
     >
       <div className="absolute inset-0 overflow-hidden" aria-hidden="true">
         <div
-          className="absolute inset-0 opacity-50"
-          style={{
-            backgroundImage: `
-              radial-gradient(circle, ${colorA} 0%, transparent 80%),
-              radial-gradient(circle, ${colorB} 0%, transparent 80%)
-            `,
-            backgroundSize: "100% 100%",
-            animation: `vt-pulse ${pulseDuration}s infinite`,
-          }}
+          className="vt-pulse absolute inset-0 opacity-50"
+          style={
+            {
+              backgroundImage: `
+                radial-gradient(circle, ${colorA} 0%, transparent 80%),
+                radial-gradient(circle, ${colorB} 0%, transparent 80%)
+              `,
+              backgroundSize: "100% 100%",
+              "--vt-dur": `${pulseDuration}s`,
+            } as React.CSSProperties
+          }
         />
 
-        <motion.div
-          className="absolute inset-0 mix-blend-screen"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, ease: "easeInOut" }}
-        >
+        {/* Los blobs con blur son lo más pesado: solo se montan mientras el hero está en pantalla */}
+        {inView ? (
           <motion.div
-            className="absolute -top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-purple-600 opacity-40 blur-3xl filter"
-            animate={{ x: [-50, 50, -50], y: [-20, 20, -20], scale: [1, 1.2, 1] }}
-            transition={{
-              duration: 30,
-              repeat: Infinity,
-              repeatType: "mirror",
-              ease: "easeInOut",
-            }}
-          />
-          <motion.div
-            className="absolute -bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-fuchsia-600 opacity-40 blur-3xl filter"
-            animate={{ x: [50, -50, 50], y: [20, -20, 20], scale: [1, 1.3, 1] }}
-            transition={{
-              duration: 40,
-              repeat: Infinity,
-              repeatType: "mirror",
-              ease: "easeInOut",
-            }}
-          />
-          <motion.div
-            className="absolute top-1/3 left-1/3 h-1/3 w-1/3 rounded-full bg-indigo-700 opacity-30 blur-3xl filter"
-            animate={{ x: [20, -20, 20], y: [-30, 30, -30], rotate: [0, 360, 0] }}
-            transition={{
-              duration: 50,
-              repeat: Infinity,
-              repeatType: "mirror",
-              ease: "easeInOut",
-            }}
-          />
-        </motion.div>
+            className="absolute inset-0 mix-blend-screen"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1, ease: "easeInOut" }}
+          >
+            <motion.div
+              className="absolute -top-1/4 -left-1/4 h-1/2 w-1/2 rounded-full bg-purple-600 opacity-40 blur-3xl will-change-transform"
+              animate={{ x: [-50, 50, -50], y: [-20, 20, -20], scale: [1, 1.2, 1] }}
+              transition={{
+                duration: 30,
+                repeat: Infinity,
+                repeatType: "mirror",
+                ease: "easeInOut",
+              }}
+            />
+            <motion.div
+              className="absolute -bottom-1/4 -right-1/4 h-1/2 w-1/2 rounded-full bg-fuchsia-600 opacity-40 blur-3xl will-change-transform"
+              animate={{ x: [50, -50, 50], y: [20, -20, 20], scale: [1, 1.3, 1] }}
+              transition={{
+                duration: 40,
+                repeat: Infinity,
+                repeatType: "mirror",
+                ease: "easeInOut",
+              }}
+            />
+            <motion.div
+              className="absolute top-1/3 left-1/3 h-1/3 w-1/3 rounded-full bg-indigo-700 opacity-30 blur-3xl will-change-transform"
+              animate={{ x: [20, -20, 20], y: [-30, 30, -30] }}
+              transition={{
+                duration: 50,
+                repeat: Infinity,
+                repeatType: "mirror",
+                ease: "easeInOut",
+              }}
+            />
+          </motion.div>
+        ) : null}
 
         {stars.map((star, i) => (
-          <motion.div
+          <span
             key={i}
-            className="absolute h-0.5 w-0.5 rounded-full bg-white"
-            style={{ left: `${star.x}%`, top: `${star.y}%` }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0, star.peak, 0] }}
-            transition={{
-              duration: star.dur,
-              repeat: Infinity,
-              delay: star.delay,
-            }}
+            className="vt-star absolute h-0.5 w-0.5 rounded-full bg-white"
+            style={
+              {
+                left: `${star.x}%`,
+                top: `${star.y}%`,
+                "--peak": star.peak.toFixed(2),
+                "--vt-dur": `${star.dur.toFixed(2)}s`,
+                "--vt-delay": `${star.delay.toFixed(2)}s`,
+              } as React.CSSProperties
+            }
           />
         ))}
 
@@ -820,16 +938,16 @@ const AuroraBackground: React.FC<AuroraBackgroundProps> = ({
 
 const groupContainer: Variants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.12, delayChildren: 0.3 } },
+  visible: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
 };
 
 const groupItem: Variants = {
-  hidden: { opacity: 0, filter: "blur(12px)", y: 12 },
+  hidden: { opacity: 0, filter: "blur(8px)", y: 12 },
   visible: {
     opacity: 1,
     filter: "blur(0px)",
     y: 0,
-    transition: { type: "spring" as const, bounce: 0.3, duration: 1.5 },
+    transition: { type: "spring" as const, bounce: 0.25, duration: 0.9 },
   },
 };
 
@@ -872,7 +990,7 @@ const dockItems: DockItemData[] = [
   {
     id: "servicios",
     icon: <LayoutGrid size={20} />,
-    label: "Servicios",
+    label: "Servicios y planes",
     onClick: () => goTo("servicios"),
   },
   {
@@ -882,10 +1000,10 @@ const dockItems: DockItemData[] = [
     onClick: () => goTo("portfolio"),
   },
   {
-    id: "whatsapp",
-    icon: <MessageCircle size={20} />,
-    label: "WhatsApp",
-    onClick: () => openWhatsApp(),
+    id: "quienes-somos",
+    icon: <Users size={20} />,
+    label: "Quiénes somos",
+    onClick: () => goTo("quienes-somos"),
   },
 ];
 
@@ -893,7 +1011,21 @@ const DockItemComponent: React.FC<{
   item: DockItemData;
   isHovered: boolean;
   onHover: (id: string | null) => void;
-}> = ({ item, isHovered, onHover }) => {
+  hideTooltip?: boolean;
+  expanded?: boolean;
+  controls?: string;
+  trigger?: boolean;
+  children?: React.ReactNode;
+}> = ({
+  item,
+  isHovered,
+  onHover,
+  hideTooltip = false,
+  expanded,
+  controls,
+  trigger,
+  children,
+}) => {
   return (
     <div
       data-magnetic
@@ -904,11 +1036,15 @@ const DockItemComponent: React.FC<{
       <button
         type="button"
         aria-label={item.label}
+        aria-expanded={expanded}
+        aria-controls={controls}
+        data-wa-trigger={trigger ? "" : undefined}
         onClick={item.onClick}
         onFocus={() => onHover(item.id)}
         onBlur={() => onHover(null)}
         className={cn(
-          "relative flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white backdrop-blur-[2px] transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60",
+          "relative flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white backdrop-blur-[2px] transition-all duration-300 ease-out",
+          focusRing,
           isHovered &&
             "-translate-y-1 scale-110 border-white/20 bg-white/10 shadow-lg shadow-white/10",
         )}
@@ -924,9 +1060,12 @@ const DockItemComponent: React.FC<{
       </button>
 
       <div
+        aria-hidden="true"
         className={cn(
           "pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/5 bg-black/70 px-2.5 py-1 text-xs font-normal text-white shadow-sm backdrop-blur transition-all duration-200",
-          isHovered ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
+          isHovered && !hideTooltip
+            ? "translate-y-0 opacity-100"
+            : "translate-y-1 opacity-0",
         )}
       >
         {item.label}
@@ -934,21 +1073,53 @@ const DockItemComponent: React.FC<{
           <div className="h-2 w-2 rotate-45 border-b border-r border-white/5 bg-black/70" />
         </div>
       </div>
+
+      {children}
     </div>
   );
 };
 
 const MinimalistDock: React.FC = () => {
   const [hoveredItem, setHoveredItem] = React.useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const navRef = React.useRef<HTMLElement>(null);
+
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!navRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMenuOpen(false);
+      navRef.current
+        ?.querySelector<HTMLButtonElement>("[data-wa-trigger]")
+        ?.focus();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
+  const whatsappItem: DockItemData = {
+    id: "whatsapp",
+    icon: <MessageCircle size={20} />,
+    label: "WhatsApp: elegir con quién hablar",
+    onClick: () => setMenuOpen((open) => !open),
+  };
 
   return (
     <nav
+      ref={navRef}
       aria-label="Navegación principal"
-      className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2"
+      className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2"
     >
       <div
         className={cn(
-          "flex items-end gap-3 rounded-2xl border border-white/10 bg-black/40 px-5 py-3 shadow-2xl backdrop-blur-xl transition-transform duration-500 ease-out",
+          "flex items-end gap-3 rounded-2xl border border-white/10 bg-black/40 px-4 py-3 shadow-2xl backdrop-blur-xl transition-transform duration-500 ease-out sm:px-5",
           hoveredItem && "scale-105",
         )}
       >
@@ -960,6 +1131,42 @@ const MinimalistDock: React.FC = () => {
             onHover={setHoveredItem}
           />
         ))}
+
+        <DockItemComponent
+          item={whatsappItem}
+          isHovered={hoveredItem === whatsappItem.id}
+          onHover={setHoveredItem}
+          hideTooltip={menuOpen}
+          expanded={menuOpen}
+          controls="dock-wa-menu"
+          trigger
+        >
+          {menuOpen ? (
+            <div
+              id="dock-wa-menu"
+              role="group"
+              aria-label="Elegir con quién hablar por WhatsApp"
+              className="absolute bottom-[calc(100%+0.75rem)] right-0 w-60 rounded-2xl border border-white/10 bg-black/85 p-2 shadow-2xl backdrop-blur-xl"
+            >
+              {CONTACTS.map((contact) => (
+                <a
+                  key={contact.id}
+                  href={waLink(contact.id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setMenuOpen(false)}
+                  className={cn(
+                    "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm text-zinc-100 transition-colors hover:bg-white/10",
+                    focusRing,
+                  )}
+                >
+                  <MessageCircle size={16} aria-hidden="true" />
+                  Escribir a {contact.name}
+                </a>
+              ))}
+            </div>
+          ) : null}
+        </DockItemComponent>
       </div>
     </nav>
   );
@@ -969,21 +1176,16 @@ const MinimalistDock: React.FC = () => {
    CARD DECK CAROUSEL
    ============================================================ */
 
-type LandPalette = "dawn" | "alpine" | "dusk" | "mist";
-
 type Slide = {
   image?: string;
-  title?: string;
+  title: string;
   caption?: string;
   alt?: string;
   href?: string;
-  palette?: LandPalette;
-  seed?: number;
 };
 
 type CardDeckCarouselProps = {
   slides?: Slide[];
-  height?: number | string;
   cardWidth?: string;
   aspect?: string;
   scatter?: number;
@@ -1024,247 +1226,67 @@ function pad2(n: number): string {
   return n < 10 ? "0" + n : String(n);
 }
 
-const PALETTES: Record<
-  LandPalette,
-  {
-    top: string;
-    bottom: string;
-    sun: string;
-    far: string;
-    near: string;
-    mist: string;
-  }
-> = {
-  dawn: { top: "#e7b7a5", bottom: "#f8e8d6", sun: "#fff4df", far: "#d2b2bb", near: "#3a2a3b", mist: "255,240,232" },
-  alpine: { top: "#7ea5c8", bottom: "#e3ecf2", sun: "#ffffff", far: "#a9bfd0", near: "#1c3044", mist: "236,244,250" },
-  dusk: { top: "#2a2450", bottom: "#ef8d60", sun: "#ffd9a6", far: "#93607c", near: "#18121f", mist: "255,196,160" },
-  mist: { top: "#c4d0cb", bottom: "#eef1ec", sun: "#ffffff", far: "#aebcb5", near: "#2c3a33", mist: "246,248,245" },
-};
-
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function hexRgb(h: string): [number, number, number] {
-  const v = parseInt(h.replace("#", ""), 16);
-  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
-}
-
-function mixRgb(a: string, b: string, t: number): string {
-  const A = hexRgb(a);
-  const B = hexRgb(b);
-  return (
-    "rgb(" + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(",") + ")"
-  );
-}
-
-function paintLandscape(
-  seed: number,
-  palette: LandPalette,
-  w = 1600,
-  h = 1000,
-): string {
-  if (typeof document === "undefined") return "";
-  const c = document.createElement("canvas");
-  c.width = w;
-  c.height = h;
-  const g = c.getContext("2d");
-  if (!g) return "";
-  const P = PALETTES[palette] ?? PALETTES.dawn;
-  const r = mulberry32(seed * 104729 + 7);
-
-  const sky = g.createLinearGradient(0, 0, 0, h * 0.72);
-  sky.addColorStop(0, P.top);
-  sky.addColorStop(1, P.bottom);
-  g.fillStyle = sky;
-  g.fillRect(0, 0, w, h);
-  const sx = w * (0.22 + r() * 0.56);
-  const sy = h * (0.26 + r() * 0.16);
-  const halo = g.createRadialGradient(sx, sy, 0, sx, sy, w * 0.45);
-  halo.addColorStop(0, "rgba(" + hexRgb(P.sun).join(",") + ",.85)");
-  halo.addColorStop(0.08, "rgba(" + hexRgb(P.sun).join(",") + ",.55)");
-  halo.addColorStop(1, "rgba(" + hexRgb(P.sun).join(",") + ",0)");
-  g.fillStyle = halo;
-  g.fillRect(0, 0, w, h);
-  g.fillStyle = P.sun;
-  g.beginPath();
-  g.arc(sx, sy, h * 0.045, 0, Math.PI * 2);
-  g.fill();
-
-  const layers = 5;
-  for (let L = 0; L < layers; L++) {
-    const k = L / (layers - 1);
-    const base = h * (0.42 + k * 0.4);
-    const amp = h * (0.07 + k * 0.1);
-    const ph = [r(), r(), r(), r()].map((v) => v * Math.PI * 2);
-    const fr = [1.3 + r(), 3.1 + r() * 2, 7 + r() * 4, 17 + r() * 8];
-    const ridge = (x: number) => {
-      const u = x / w;
-      return (
-        base -
-        amp *
-          (0.55 * Math.sin(u * fr[0] + ph[0]) +
-            0.28 * Math.sin(u * fr[1] + ph[1]) +
-            0.12 * Math.abs(Math.sin(u * fr[2] + ph[2])) +
-            0.05 * Math.sin(u * fr[3] + ph[3]))
-      );
-    };
-    const mist = g.createLinearGradient(0, base - amp * 1.4, 0, base + amp * 0.4);
-    mist.addColorStop(0, "rgba(" + P.mist + ",0)");
-    mist.addColorStop(
-      1,
-      "rgba(" + P.mist + "," + (0.55 - k * 0.35).toFixed(2) + ")",
-    );
-    g.fillStyle = mist;
-    g.fillRect(0, base - amp * 1.4, w, amp * 1.8);
-    const body = g.createLinearGradient(0, base - amp, 0, h);
-    body.addColorStop(0, mixRgb(P.far, P.near, Math.pow(k, 1.3)));
-    body.addColorStop(
-      1,
-      mixRgb(P.far, P.near, Math.min(1, Math.pow(k, 1.3) + 0.18)),
-    );
-    g.fillStyle = body;
-    g.beginPath();
-    g.moveTo(0, h);
-    for (let x = 0; x <= w; x += 6) g.lineTo(x, ridge(x));
-    g.lineTo(w, h);
-    g.closePath();
-    g.fill();
-    if (L >= layers - 2) {
-      g.fillStyle = mixRgb(P.far, P.near, Math.min(1, Math.pow(k, 1.3) + 0.08));
-      for (let x = 0; x < w; x += 7 + r() * 9) {
-        if (r() < 0.35) continue;
-        const y = ridge(x) + 2;
-        const th = h * (0.025 + r() * 0.035) * (0.6 + k);
-        const tw = th * 0.32;
-        g.beginPath();
-        g.moveTo(x, y - th);
-        g.lineTo(x + tw, y);
-        g.lineTo(x - tw, y);
-        g.closePath();
-        g.fill();
-      }
-    }
-  }
-
-  const vig = g.createRadialGradient(w / 2, h * 0.45, h * 0.3, w / 2, h / 2, w * 0.78);
-  vig.addColorStop(0, "rgba(0,0,0,0)");
-  vig.addColorStop(1, "rgba(0,0,0,.32)");
-  g.fillStyle = vig;
-  g.fillRect(0, 0, w, h);
-  const grain = g.getImageData(0, 0, w, h);
-  const d = grain.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const v = (r() - 0.5) * 14;
-    d[i] += v;
-    d[i + 1] += v;
-    d[i + 2] += v;
-  }
-  g.putImageData(grain, 0, 0);
-  return c.toDataURL("image/jpeg", 0.88);
-}
-
-const shot = (url: string) =>
-  "https://image.thum.io/get/width/1000/crop/1333/noanimate/" + url;
-
+/** Imágenes locales: colocá tus capturas en /public con estos nombres. */
 const DEMO_SLIDES: Slide[] = [
   {
-    image: shot("https://carnetmanipulacionalimentos.netlify.app"),
+    image: "/imagen1.png",
     href: "https://carnetmanipulacionalimentos.netlify.app",
     title: "Carnet de Manipulación de Alimentos",
-    caption: "Landing de curso de certificación en San Rafael.",
+    caption: "Landing de un curso de certificación en San Rafael.",
     alt: "Captura de la landing del Carnet de Manipulación de Alimentos",
-    palette: "dawn",
-    seed: 3,
   },
   {
-    image: shot("https://www.carolinagarcia.com.ar"),
+    image: "/imagen2.png",
     href: "https://www.carolinagarcia.com.ar",
     title: "Carolina García",
     caption: "Sitio web profesional.",
-    alt: "Captura del sitio de Carolina García",
-    palette: "mist",
-    seed: 21,
+    alt: "Captura del sitio web de Carolina García",
   },
   {
-    image: shot("https://danger-fitness-web.netlify.app"),
+    image: "/imagen3.png",
     href: "https://danger-fitness-web.netlify.app",
     title: "Danger Fitness",
     caption: "Sitio web de entrenamiento.",
-    alt: "Captura del sitio de Danger Fitness",
-    palette: "dusk",
-    seed: 14,
+    alt: "Captura del sitio web de Danger Fitness",
   },
   {
-    image: shot("https://bautismo-lian.netlify.app"),
+    image: "/imagen4.png",
     href: "https://bautismo-lian.netlify.app",
     title: "Invitación de Bautismo",
     caption: "Invitación digital para eventos.",
     alt: "Captura de la invitación digital de bautismo",
-    palette: "alpine",
-    seed: 8,
   },
 ];
 
-function useSlideImages(slides: Slide[]) {
-  const key = slides
-    .map((s) => s.image || (s.palette || "dawn") + ":" + (s.seed ?? 1))
-    .join("|");
-  const [painted, setPainted] = React.useState<string[]>(() =>
-    slides.map(() => ""),
-  );
-  const [failed, setFailed] = React.useState<Record<number, boolean>>({});
-
-  React.useEffect(() => {
-    setPainted(
-      slides.map((s, i) =>
-        s.image && !failed[i]
-          ? ""
-          : paintLandscape(s.seed ?? i + 1, s.palette || "dawn"),
-      ),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, failed]);
-
-  const srcs = slides.map((s, i) =>
-    s.image && !failed[i] ? s.image : painted[i] || "",
-  );
-  const onError = (i: number) =>
-    setFailed((f) => (f[i] ? f : { ...f, [i]: true }));
-
-  return { srcs, onError };
-}
-
 const CD_CSS = [
-  ".cd-root{position:relative;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(28px,5vh,52px);overflow:hidden;background:var(--cd-bg);color:var(--cd-ink);outline:none;padding:24px 16px;box-sizing:border-box}",
+  ".cd-root{position:relative;width:100%;display:flex;flex-direction:column;align-items:center;gap:28px;overflow-x:clip;background:var(--cd-bg);color:var(--cd-ink);outline:none;padding:56px 16px 8px;box-sizing:border-box}",
   ".cd-root:focus-visible{box-shadow:inset 0 0 0 2px var(--cd-ink)}",
-  ".cd-deck{position:relative;width:var(--cd-w);aspect-ratio:var(--cd-aspect);max-height:calc(var(--cd-h) * .62);max-width:calc(var(--cd-h) * .62 * var(--cd-ar));touch-action:pan-y}",
+  ".cd-deck{position:relative;width:var(--cd-w);max-width:100%;aspect-ratio:var(--cd-aspect);touch-action:pan-y}",
   ".cd-card{position:absolute;inset:0;border-radius:18px;overflow:hidden;background:#1a1a1f;box-shadow:0 1px 2px rgba(0,0,0,.2),0 30px 60px -30px rgba(0,0,0,.8);border:1px solid rgba(255,255,255,.08);transition:transform .6s cubic-bezier(.2,.8,.2,1),opacity .4s ease,filter .4s ease;will-change:transform}",
   ".cd-card[data-top='1']{cursor:grab}",
   ".cd-card[data-drag='1']{cursor:grabbing;transition:none}",
   ".cd-card[data-fly='1']{transition:transform .45s cubic-bezier(.3,.5,.3,1),opacity .45s ease}",
   ".cd-card[data-snap='1']{transition:none}",
-  ".cd-card img{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;display:block;pointer-events:none;user-select:none}",
-  ".cd-meta{display:flex;align-items:center;gap:clamp(16px,3vw,32px);width:min(var(--cd-w),100%);max-width:560px}",
-  ".cd-cap{flex:1;min-width:0;overflow:hidden;padding-bottom:.2em}",
-  ".cd-cap>*{display:block;animation:cd-in .6s cubic-bezier(.2,.8,.2,1) both}",
-  ".cd-title{font:500 clamp(16px,2vw,22px)/1.2 ui-sans-serif,system-ui,sans-serif;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
-  ".cd-sub{margin-top:4px;font:400 13px/1.4 ui-sans-serif,system-ui,sans-serif;color:var(--cd-muted);animation-delay:.05s}",
+  ".cd-card img{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;object-position:top;display:block;pointer-events:none;user-select:none}",
+  ".cd-fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;text-align:center;background:#111114}",
+  ".cd-fallback strong{font-weight:600;font-size:clamp(18px,3vw,22px);line-height:1.25;text-wrap:balance}",
+  ".cd-fallback span{font-size:14px;color:var(--cd-muted)}",
+  ".cd-meta{display:flex;flex-direction:column;gap:20px;width:var(--cd-w);max-width:100%}",
+  ".cd-cap{display:grid}",
+  ".cd-cap-item{grid-area:1/1;visibility:hidden;opacity:0}",
+  ".cd-cap-item[data-on='1']{visibility:visible;opacity:1;animation:cd-in .5s cubic-bezier(.2,.8,.2,1) both}",
+  ".cd-title{margin:0;font-weight:600;font-size:clamp(18px,2.2vw,24px);line-height:1.25;letter-spacing:-.01em;text-wrap:balance;overflow-wrap:break-word}",
+  ".cd-sub{margin:6px 0 0;font-size:15px;line-height:1.55;color:var(--cd-muted);overflow-wrap:break-word}",
+  ".cd-nav{display:flex;align-items:center;justify-content:space-between;gap:16px}",
   ".cd-count{font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;color:var(--cd-muted)}",
   ".cd-count b{color:var(--cd-ink);font-weight:500}",
-  ".cd-btn{appearance:none;border:1px solid var(--cd-line);background:transparent;color:inherit;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;cursor:pointer;flex:none;transition:background .2s ease,color .2s ease}",
-  ".cd-btn:hover{background:var(--cd-ink);color:#000}",
+  ".cd-btn{appearance:none;border:1px solid var(--cd-line);background:transparent;color:inherit;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;cursor:pointer;flex:none;touch-action:manipulation;transition:background .2s ease,color .2s ease}",
+  "@media (hover:hover){.cd-btn:hover{background:var(--cd-ink);color:#000}}",
   ".cd-btn:focus-visible{outline:2px solid var(--cd-ink);outline-offset:2px}",
+  ".cd-demo{display:flex;justify-content:center}",
   ".cd-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}",
-  "@keyframes cd-in{from{transform:translateY(100%);opacity:0}to{transform:none;opacity:1}}",
-  "@media (prefers-reduced-motion:reduce){.cd-card,.cd-card[data-fly='1']{transition:opacity .3s ease}.cd-cap>*{animation:none}}",
+  "@keyframes cd-in{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}",
+  "@media (prefers-reduced-motion:reduce){.cd-card,.cd-card[data-fly='1']{transition:opacity .3s ease}.cd-cap-item[data-on='1']{animation:none}}",
 ].join("\n");
 
 type Override = {
@@ -1277,9 +1299,8 @@ type Override = {
 
 const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
   slides = DEMO_SLIDES,
-  height = "100svh",
-  cardWidth = "min(78vw, 440px)",
-  aspect = "4 / 5",
+  cardWidth = "min(78vw, 400px)",
+  aspect = "3 / 4",
   scatter = 6,
   autoplay = 4200,
   background = "#000",
@@ -1290,10 +1311,10 @@ const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
   ariaLabel = "Carrusel de demos",
 }) => {
   const n = slides.length;
-  const { srcs, onError } = useSlideImages(slides);
   const [top, setTop] = React.useState(0);
   const [over, setOver] = React.useState<Override | null>(null);
   const [reduce, setReduce] = React.useState(false);
+  const [failed, setFailed] = React.useState<Record<number, boolean>>({});
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const deckRef = React.useRef<HTMLDivElement | null>(null);
   const busy = React.useRef(false);
@@ -1301,9 +1322,25 @@ const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
   const topRef = React.useRef(0);
   topRef.current = top;
 
+  const markFailed = React.useCallback(
+    (i: number) => setFailed((f) => (f[i] ? f : { ...f, [i]: true })),
+    [],
+  );
+
   React.useEffect(() => {
     setReduce(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   }, []);
+
+  // Si la imagen falló antes de hidratar, onError no se dispara: lo revisamos al montar.
+  React.useEffect(() => {
+    rootRef.current
+      ?.querySelectorAll<HTMLImageElement>("img[data-i]")
+      .forEach((img) => {
+        if (img.complete && img.naturalWidth === 0) {
+          markFailed(Number(img.dataset.i));
+        }
+      });
+  }, [markFailed]);
 
   const later = (fn: () => void, ms: number) => window.setTimeout(fn, ms);
 
@@ -1414,7 +1451,7 @@ const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
     setOver({
       i: topRef.current,
       x: dx,
-      y: dy,
+      y: dy * 0.3,
       r: reduce ? 0 : dx * 0.05,
       mode: "drag",
     });
@@ -1428,8 +1465,16 @@ const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
     const dx = e.clientX - d.x;
     const dy = e.clientY - d.y;
     const w = deckRef.current?.offsetWidth || 400;
-    if (isThrow(dx, d.vx, w)) throwTop(dx, dx, dy, dy);
+    if (isThrow(dx, d.vx, w)) throwTop(dx, dx, dy * 0.3, dy);
     else setOver(null);
+  };
+
+  // En pantallas táctiles el navegador cancela el gesto cuando el usuario hace
+  // scroll vertical: ahí no hay que tirar la tarjeta, solo devolverla a su lugar.
+  const onCancel = () => {
+    drag.current = null;
+    lastTouch.current = performance.now();
+    setOver(null);
   };
 
   const onKey = (e: React.KeyboardEvent) => {
@@ -1440,26 +1485,15 @@ const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
     e.preventDefault();
   };
 
-  const s = slides[top] || {};
-
-  const ratio = (() => {
-    if (aspect.includes("/")) {
-      const [a, b] = aspect.split("/").map((v) => parseFloat(v));
-      return b ? a / b : 1;
-    }
-    return parseFloat(aspect) || 1;
-  })();
+  const s = slides[top] || { title: "" };
 
   const rootStyle = {
-    height,
-    "--cd-h": typeof height === "number" ? height + "px" : height,
     "--cd-w": cardWidth,
     "--cd-aspect": aspect,
-    "--cd-ar": String(ratio),
     "--cd-bg": background,
     "--cd-ink": ink,
-    "--cd-muted": "color-mix(in srgb, var(--cd-ink) 55%, transparent)",
-    "--cd-line": "color-mix(in srgb, var(--cd-ink) 18%, transparent)",
+    "--cd-muted": "color-mix(in srgb, var(--cd-ink) 68%, transparent)",
+    "--cd-line": "color-mix(in srgb, var(--cd-ink) 25%, transparent)",
     ...style,
   } as React.CSSProperties;
 
@@ -1508,67 +1542,94 @@ const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
               onPointerDown={isTop ? onDown : undefined}
               onPointerMove={isTop ? onMove : undefined}
               onPointerUp={isTop ? onUp : undefined}
-              onPointerCancel={isTop ? onUp : undefined}
+              onPointerCancel={isTop ? onCancel : undefined}
             >
-              {srcs[i] ? (
+              {sl.image && !failed[i] ? (
                 <img
-                  src={srcs[i]}
-                  alt={isTop ? sl.alt || sl.title || "" : ""}
+                  data-i={i}
+                  src={sl.image}
+                  alt={isTop ? sl.alt || sl.title : ""}
                   draggable={false}
-                  onError={() => onError(i)}
+                  loading="lazy"
+                  decoding="async"
+                  onError={() => markFailed(i)}
                 />
-              ) : null}
+              ) : (
+                <div className="cd-fallback" aria-hidden="true">
+                  <strong>{sl.title}</strong>
+                  <span>Imagen en preparación</span>
+                </div>
+              )}
             </div>
           );
         })}
       </div>
+
       <div className="cd-meta">
-        <button
-          type="button"
-          className="cd-btn"
-          aria-label="Anterior"
-          onClick={() => {
-            lastTouch.current = performance.now();
-            pullBack();
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.4" />
-          </svg>
-        </button>
-        <div className="cd-cap" key={top} aria-hidden="true">
-          {s.title ? <span className="cd-title">{s.title}</span> : null}
-          {s.caption ? <span className="cd-sub">{s.caption}</span> : null}
+        {/* Todos los textos comparten la misma celda: el alto lo marca el más largo y nada se corta ni salta */}
+        <div className="cd-cap">
+          {slides.map((sl, i) => (
+            <div
+              key={i}
+              className="cd-cap-item"
+              data-on={i === top ? "1" : "0"}
+              aria-hidden={i === top ? undefined : true}
+            >
+              <h3 className="cd-title">{sl.title}</h3>
+              {sl.caption ? <p className="cd-sub">{sl.caption}</p> : null}
+            </div>
+          ))}
         </div>
-        <span className="cd-count" aria-hidden="true">
-          <b>{pad2(top + 1)}</b> / {pad2(n)}
-        </span>
-        <button
-          type="button"
-          className="cd-btn"
-          aria-label="Siguiente"
-          onClick={() => {
-            lastTouch.current = performance.now();
-            throwTop(1);
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="m6 3 5 5-5 5" stroke="currentColor" strokeWidth="1.4" />
-          </svg>
-        </button>
-      </div>
-      {s.href ? (
-        <MagneticWrap>
-          <OriginButton
-            variant="outline"
-            onClick={() => window.open(s.href, "_blank", "noopener,noreferrer")}
+
+        <div className="cd-nav">
+          <button
+            type="button"
+            className="cd-btn"
+            aria-label="Demo anterior"
+            onClick={() => {
+              lastTouch.current = performance.now();
+              pullBack();
+            }}
           >
-            Ver demo ↗
-          </OriginButton>
-        </MagneticWrap>
-      ) : null}
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.4" />
+            </svg>
+          </button>
+          <span className="cd-count" aria-hidden="true">
+            <b>{pad2(top + 1)}</b> / {pad2(n)}
+          </span>
+          <button
+            type="button"
+            className="cd-btn"
+            aria-label="Demo siguiente"
+            onClick={() => {
+              lastTouch.current = performance.now();
+              throwTop(1);
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="m6 3 5 5-5 5" stroke="currentColor" strokeWidth="1.4" />
+            </svg>
+          </button>
+        </div>
+
+        {s.href ? (
+          <div className="cd-demo">
+            <MagneticWrap>
+              <OriginButton
+                variant="outline"
+                aria-label={`Ver la demo de ${s.title} (se abre en una pestaña nueva)`}
+                onClick={() => window.open(s.href, "_blank", "noopener,noreferrer")}
+              >
+                Ver demo ↗
+              </OriginButton>
+            </MagneticWrap>
+          </div>
+        ) : null}
+      </div>
+
       <div className="cd-sr" aria-live="polite">
-        {"Tarjeta " + (top + 1) + " de " + n + (s.title ? ": " + s.title : "")}
+        {"Demo " + (top + 1) + " de " + n + (s.title ? ": " + s.title : "")}
       </div>
     </div>
   );
@@ -1578,39 +1639,30 @@ const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
    SECCIONES
    ============================================================ */
 
-const MagneticWrap: React.FC<{ children: React.ReactNode; className?: string }> = ({
-  children,
-  className,
-}) => (
-  <span
-    data-magnetic
-    data-magnetic-color="rgba(255,255,255,0.12)"
-    className={cn("inline-block rounded-xl", className)}
-  >
-    {children}
-  </span>
-);
-
 const Hero: React.FC = () => (
-  <section id="inicio">
-    <AuroraBackground starCount={80} pulseDuration={8} className="px-4 py-28">
+  <section id="inicio" aria-labelledby="hero-titulo">
+    <AuroraBackground starCount={24} pulseDuration={8} className="px-4 py-28">
       <AnimatedGroup className="mx-auto flex max-w-3xl flex-col items-center text-center">
-        <h1 className="bg-gradient-to-br from-gray-50 to-gray-400 bg-clip-text text-4xl font-bold tracking-tight text-transparent sm:text-5xl md:text-7xl">
-          VisoTech: Desarrollo Web que Vende
+        <h1
+          id="hero-titulo"
+          className="bg-gradient-to-br from-gray-50 to-gray-400 bg-clip-text pb-1 text-4xl font-bold tracking-tight text-balance text-transparent sm:text-5xl md:text-6xl"
+        >
+          VisoTech: webs visuales para negocios y eventos
         </h1>
         <p className="mx-auto mt-6 max-w-xl text-lg text-gray-300">
-          Delegá el código y el diseño. Nosotros nos encargamos de que tu negocio
-          local destaque y convierta.
+          Diseñamos landing pages para negocios, cartas y catálogos digitales e
+          invitaciones para eventos. A medida, con animaciones cuidadas y
+          pensadas para el celular.
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <MagneticWrap>
             <OriginButton variant="solid" onClick={() => goTo("servicios")}>
-              Ver Planes
+              Ver servicios
             </OriginButton>
           </MagneticWrap>
           <MagneticWrap>
-            <OriginButton variant="outline" onClick={() => openWhatsApp()}>
-              Hablar por WhatsApp
+            <OriginButton variant="outline" onClick={() => goTo("contacto")}>
+              Consultar presupuesto
             </OriginButton>
           </MagneticWrap>
         </div>
@@ -1619,14 +1671,535 @@ const Hero: React.FC = () => (
   </section>
 );
 
+/* ---------- Servicios y planes ---------- */
+
+type Plan = {
+  id: string;
+  icon: React.ReactNode;
+  title: string;
+  tagline: string;
+  ideal: string;
+  includes: string[];
+  note?: string;
+  /** Texto que completa el mensaje precargado de WhatsApp: "Quiero consultar por ..." */
+  topic: string;
+  featured?: boolean;
+  span: string;
+};
+
+const PLANS: Plan[] = [
+  {
+    id: "landing",
+    icon: <Rocket size={20} />,
+    title: "Landing page para negocios",
+    tagline:
+      "Una página clara y visual que presenta tu negocio y lleva a la consulta.",
+    ideal:
+      "Gimnasios, peluquerías, tiendas, emprendimientos, profesionales y cualquier negocio que quiera tener presencia en Internet.",
+    includes: [
+      "Diseño personalizado con la identidad de tu negocio",
+      "Animaciones y detalles visuales cuidados",
+      "Adaptada a celular y computadora",
+      "Botones de contacto por WhatsApp",
+    ],
+    topic: "una landing page para mi negocio",
+    featured: true,
+    span: "md:col-span-4",
+  },
+  {
+    id: "invitacion",
+    icon: <PartyPopper size={20} />,
+    title: "Invitación digital para eventos",
+    tagline: "Una invitación web con diseño propio para compartir con tus invitados.",
+    ideal: "Cumpleaños, bautismos, casamientos y otros eventos especiales.",
+    includes: [
+      "Diseño personalizado para tu evento",
+      "Experiencia visual con animaciones",
+      "Botón para confirmar asistencia por WhatsApp",
+    ],
+    topic: "una invitación digital para un evento",
+    span: "md:col-span-2",
+  },
+  {
+    id: "carta",
+    icon: <Utensils size={20} />,
+    title: "Carta o catálogo digital",
+    tagline:
+      "Tus productos o tu menú en una página visual, fácil de abrir desde el celular.",
+    ideal:
+      "Restaurantes, bares, cafeterías, comercios y emprendimientos que quieren mostrar sus productos o servicios.",
+    includes: [
+      "Fotografías de tus productos o platos",
+      "Categorías y precios",
+      "Botón de contacto por WhatsApp",
+    ],
+    note: "Es una carta para ver y consultar: no incluye pagos ni pedidos online.",
+    topic: "una carta o catálogo digital",
+    span: "md:col-span-3",
+  },
+  {
+    id: "personalizada",
+    icon: <Sparkles size={20} />,
+    title: "Proyecto personalizado",
+    tagline:
+      "Un sitio moderno armado a medida de tu identidad y tus necesidades.",
+    ideal:
+      "Quienes necesitan una página con una idea o una presentación diferente.",
+    includes: [
+      "Diseño y animaciones a medida",
+      "Las secciones que tu proyecto necesite",
+      "Adaptado a celular y computadora",
+    ],
+    note: "Nos enfocamos en diseño y frontend: sin login, paneles de administración ni pagos.",
+    topic: "un proyecto web personalizado",
+    span: "md:col-span-3",
+  },
+];
+
 const planCard =
-  "relative flex flex-col justify-between overflow-hidden rounded-3xl border border-white/10 bg-black/40 p-7 backdrop-blur-xl transition-colors duration-300 hover:border-white/20";
+  "relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 p-7 backdrop-blur-xl transition-colors duration-300 hover:border-white/20";
 
 const iconBox =
   "flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white";
 
+const WaPill: React.FC<{
+  contact: Contact;
+  topic?: string;
+  ariaLabel?: string;
+}> = ({ contact, topic, ariaLabel }) => (
+  <a
+    href={waLink(contact.id, topic)}
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label={ariaLabel}
+    className={cn(
+      "inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 text-sm font-medium text-white transition-colors hover:bg-white hover:text-neutral-950",
+      focusRing,
+    )}
+  >
+    <MessageCircle size={16} aria-hidden="true" />
+    Escribir a {contact.name}
+  </a>
+);
+
+const PlanCard: React.FC<{ plan: Plan }> = ({ plan }) => {
+  const titleId = `plan-${plan.id}`;
+  return (
+    <article
+      aria-labelledby={titleId}
+      className={cn(
+        planCard,
+        plan.span,
+        plan.featured &&
+          "border-cyan-300/30 shadow-[0_0_60px_-15px_rgba(34,211,238,0.45)] hover:border-cyan-300/50",
+      )}
+    >
+      {plan.featured ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/15 blur-3xl"
+        />
+      ) : null}
+
+      <div className="relative flex items-start justify-between">
+        <div className={cn(iconBox, plan.featured && "border-cyan-300/30 text-cyan-200")}>
+          {plan.icon}
+        </div>
+        {plan.featured ? (
+          <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-medium text-cyan-200">
+            Nuestro foco
+          </span>
+        ) : null}
+      </div>
+
+      <div className="relative mt-8">
+        <h3
+          id={titleId}
+          className={cn(
+            "font-semibold text-zinc-50",
+            plan.featured ? "text-2xl" : "text-xl",
+          )}
+        >
+          {plan.title}
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-zinc-300">{plan.tagline}</p>
+        <p className="mt-4 text-sm leading-relaxed text-zinc-400">
+          <span className="font-medium text-zinc-200">Ideal para: </span>
+          {plan.ideal}
+        </p>
+        <ul
+          className={cn(
+            "mt-5 grid gap-2.5 text-sm text-zinc-300",
+            plan.featured && "sm:grid-cols-2",
+          )}
+        >
+          {plan.includes.map((item) => (
+            <li key={item} className="flex items-start gap-2">
+              <Check
+                size={16}
+                aria-hidden="true"
+                className="mt-0.5 shrink-0 text-cyan-300"
+              />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+        {plan.note ? (
+          <p className="mt-4 text-sm leading-relaxed text-zinc-400">{plan.note}</p>
+        ) : null}
+      </div>
+
+      <div className="relative mt-auto border-t border-white/10 pt-5">
+        <p className="text-sm font-medium text-zinc-100">Consultar presupuesto</p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          {CONTACTS.map((contact) => (
+            <WaPill
+              key={contact.id}
+              contact={contact}
+              topic={plan.topic}
+              ariaLabel={`Escribir a ${contact.name} por WhatsApp para consultar el presupuesto de ${plan.title}`}
+            />
+          ))}
+        </div>
+      </div>
+    </article>
+  );
+};
+
+/* ---------- Buscador de proyecto ---------- */
+
+type FinderColumn = { id: string; name: string };
+
+type FinderNeed = {
+  id: string;
+  label: string;
+  /** Versión corta para el mensaje de WhatsApp */
+  short: string;
+  group: string;
+  /** true o un texto = incluido; false = no incluido */
+  availability: Record<string, boolean | string>;
+};
+
+const FINDER_COLUMNS: FinderColumn[] = [
+  { id: "landing", name: "Landing page" },
+  { id: "carta", name: "Carta o catálogo" },
+  { id: "invitacion", name: "Invitación digital" },
+  { id: "personalizada", name: "Proyecto personalizado" },
+];
+
+const FINDER_NEEDS: FinderNeed[] = [
+  {
+    id: "presentar",
+    label: "Presentar mi negocio o proyecto",
+    short: "presentar mi negocio o proyecto",
+    group: "Qué quiero mostrar",
+    availability: { landing: true, carta: false, invitacion: false, personalizada: true },
+  },
+  {
+    id: "productos",
+    label: "Mostrar productos o servicios con fotos y precios",
+    short: "mostrar productos o servicios con fotos y precios",
+    group: "Qué quiero mostrar",
+    availability: { landing: false, carta: true, invitacion: false, personalizada: true },
+  },
+  {
+    id: "evento",
+    label: "Contar los datos de un evento (fecha, lugar y horario)",
+    short: "datos de un evento",
+    group: "Qué quiero mostrar",
+    availability: { landing: false, carta: false, invitacion: true, personalizada: true },
+  },
+  {
+    id: "whatsapp",
+    label: "Que me contacten por WhatsApp",
+    short: "contacto por WhatsApp",
+    group: "Cómo quiero que se vea y funcione",
+    availability: {
+      landing: "Consultas",
+      carta: "Consultas",
+      invitacion: "Confirmar asistencia",
+      personalizada: true,
+    },
+  },
+  {
+    id: "animaciones",
+    label: "Animaciones y diseño a medida",
+    short: "animaciones y diseño a medida",
+    group: "Cómo quiero que se vea y funcione",
+    availability: { landing: true, carta: true, invitacion: true, personalizada: true },
+  },
+  {
+    id: "secciones",
+    label: "Secciones y estructura a medida",
+    short: "secciones y estructura a medida",
+    group: "Cómo quiero que se vea y funcione",
+    availability: { landing: false, carta: false, invitacion: false, personalizada: true },
+  },
+];
+
+const hasNeed = (need: FinderNeed | undefined, columnId: string) => {
+  const value = need?.availability[columnId];
+  return value === true || (typeof value === "string" && value.trim().length > 0);
+};
+
+const PlanFinder: React.FC = () => {
+  const [selected, setSelected] = React.useState<string[]>([]);
+
+  const toggle = (id: string) =>
+    setSelected((current) =>
+      current.includes(id) ? current.filter((x) => x !== id) : [...current, id],
+    );
+
+  const selectedNeeds = FINDER_NEEDS.filter((need) => selected.includes(need.id));
+  const matching = FINDER_COLUMNS.filter((col) =>
+    selectedNeeds.every((need) => hasNeed(need, col.id)),
+  );
+  // Entre los que cubren todo lo marcado, gana el más específico (el que incluye menos cosas).
+  const featureCount = (colId: string) =>
+    FINDER_NEEDS.filter((need) => hasNeed(need, colId)).length;
+  const minCount = matching.length
+    ? Math.min(...matching.map((col) => featureCount(col.id)))
+    : 0;
+  const best = selectedNeeds.length
+    ? matching.filter((col) => featureCount(col.id) === minCount)
+    : [];
+  const bestIds = best.map((col) => col.id);
+  const bestPlans = bestIds
+    .map((id) => PLANS.find((plan) => plan.id === id))
+    .filter((plan): plan is Plan => Boolean(plan));
+
+  const groups: { label: string; items: FinderNeed[] }[] = [];
+  FINDER_NEEDS.forEach((need) => {
+    const group = groups.find((entry) => entry.label === need.group);
+    if (group) group.items.push(need);
+    else groups.push({ label: need.group, items: [need] });
+  });
+
+  const onlyCustom = best.length === 1 && best[0].id === "personalizada";
+  const summary =
+    best.length === 0
+      ? "Marcá lo que necesitás"
+      : `Te conviene: ${best.map((col) => col.name).join(" o ")}`;
+  const detail =
+    best.length === 0
+      ? "Te mostramos qué tipo de proyecto encaja. Podés marcar varias opciones."
+      : onlyCustom
+        ? "Ningún otro tipo de proyecto reúne todo lo que marcaste: lo armamos a medida."
+        : "Cubre todo lo que marcaste.";
+  const topic = bestPlans.length
+    ? `${bestPlans.map((plan) => plan.topic).join(" o ")} (necesito: ${selectedNeeds
+        .map((need) => need.short)
+        .join(", ")})`
+    : undefined;
+
+  return (
+    <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-xl">
+      <table className="w-full table-fixed border-collapse">
+        <caption className="sr-only">
+          Marcá lo que necesitás para saber qué tipo de proyecto te conviene
+        </caption>
+        <colgroup>
+          <col className="w-full md:w-[34%]" />
+          {FINDER_COLUMNS.map((col) => (
+            <col key={col.id} className="hidden md:table-column" />
+          ))}
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col" className="px-4 pb-3 pt-5 text-left align-bottom font-normal md:px-5">
+              <span className="block text-base font-semibold text-zinc-50">
+                Lo que necesito
+              </span>
+              <span className="mt-1 block text-sm text-zinc-400">
+                {selected.length} {selected.length === 1 ? "marcada" : "marcadas"}
+              </span>
+            </th>
+            {FINDER_COLUMNS.map((col) => {
+              const isBest = bestIds.includes(col.id);
+              return (
+                <th
+                  key={col.id}
+                  scope="col"
+                  className={cn(
+                    "hidden px-2 pb-3 pt-4 text-center align-bottom font-normal transition-colors md:table-cell",
+                    isBest && "bg-cyan-300/[0.06]",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "mb-2 inline-block rounded-full border border-cyan-300/30 bg-cyan-300/10 px-2.5 py-0.5 text-xs font-medium text-cyan-200",
+                      isBest ? "visible" : "invisible",
+                    )}
+                  >
+                    Te conviene
+                  </span>
+                  <span className="block text-sm font-semibold text-balance text-zinc-50">
+                    {col.name}
+                  </span>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        {groups.map((group) => (
+          <tbody key={group.label}>
+            <tr>
+              <th
+                scope="rowgroup"
+                colSpan={FINDER_COLUMNS.length + 1}
+                className="border-y border-white/10 bg-white/[0.03] px-4 py-2 text-left text-sm font-medium text-zinc-400 md:px-5"
+              >
+                {group.label}
+              </th>
+            </tr>
+            {group.items.map((need) => {
+              const checked = selected.includes(need.id);
+              return (
+                <tr key={need.id} className="border-b border-white/5 last:border-b-0">
+                  <th scope="row" className="px-4 text-left font-normal md:px-5">
+                    <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggle(need.id)}
+                        className="peer sr-only"
+                      />
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "flex size-5 shrink-0 items-center justify-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-cyan-300/70 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-black",
+                          checked
+                            ? "border-cyan-300 bg-cyan-300 text-neutral-950"
+                            : "border-white/30",
+                        )}
+                      >
+                        {checked ? <Check size={14} strokeWidth={3} /> : null}
+                      </span>
+                      <span
+                        className={cn(
+                          "text-sm leading-snug md:text-[15px]",
+                          checked ? "font-medium text-zinc-50" : "text-zinc-300",
+                        )}
+                      >
+                        {need.label}
+                      </span>
+                    </label>
+                  </th>
+                  {FINDER_COLUMNS.map((col) => {
+                    const available = hasNeed(need, col.id);
+                    const value = need.availability[col.id];
+                    const missing = checked && !available;
+                    return (
+                      <td
+                        key={col.id}
+                        className={cn(
+                          "hidden px-2 text-center transition-colors md:table-cell",
+                          bestIds.includes(col.id) && "bg-cyan-300/[0.06]",
+                          missing && "opacity-40",
+                        )}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "inline-flex size-6 items-center justify-center rounded-full",
+                            checked && available
+                              ? "bg-cyan-300 text-neutral-950"
+                              : available
+                                ? "text-cyan-300"
+                                : "text-zinc-500",
+                          )}
+                        >
+                          {available ? <Check size={16} strokeWidth={2.5} /> : <X size={16} />}
+                        </span>
+                        {typeof value === "string" && available ? (
+                          <span className="block text-xs leading-4 text-zinc-400">
+                            {value}
+                          </span>
+                        ) : null}
+                        <span className="sr-only">
+                          {available ? "Incluido" : "No incluido"}
+                        </span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        ))}
+      </table>
+
+      <div className="border-t border-white/10 p-5 md:p-6">
+        <div className="flex items-start gap-3">
+          <span
+            aria-hidden="true"
+            className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white"
+          >
+            <SlidersHorizontal size={16} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              className="text-base font-semibold text-zinc-50"
+            >
+              {summary}
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-zinc-400">{detail}</p>
+          </div>
+          {selected.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setSelected([])}
+              className={cn(
+                "min-h-11 shrink-0 rounded-lg px-3 text-sm text-zinc-300 transition-colors hover:bg-white/10 hover:text-white",
+                focusRing,
+              )}
+            >
+              Borrar selección
+            </button>
+          ) : null}
+        </div>
+
+        {bestPlans.length > 0 ? (
+          <>
+            <ul className="mt-5 space-y-3">
+              {bestPlans.map((plan) => (
+                <li key={plan.id}>
+                  <p className="text-sm font-medium text-zinc-100">{plan.title}</p>
+                  <p className="text-sm leading-relaxed text-zinc-400">{plan.tagline}</p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-5 text-sm font-medium text-zinc-100">
+              Consultar presupuesto
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              {CONTACTS.map((contact) => (
+                <WaPill
+                  key={contact.id}
+                  contact={contact}
+                  topic={topic}
+                  ariaLabel={`Escribir a ${contact.name} por WhatsApp para consultar el presupuesto de ${best
+                    .map((col) => col.name)
+                    .join(" o ")}`}
+                />
+              ))}
+            </div>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+};
+
 const ServicesGrid: React.FC = () => (
-  <section id="servicios" className="relative px-4 py-24 md:px-8">
+  <section
+    id="servicios"
+    aria-labelledby="servicios-titulo"
+    className="relative px-4 py-24 md:px-8"
+  >
     <div
       aria-hidden="true"
       className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(79,70,229,0.12),transparent_60%)]"
@@ -1634,119 +2207,68 @@ const ServicesGrid: React.FC = () => (
     <div className="relative mx-auto max-w-6xl">
       <div className="mb-12 text-center">
         <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300/70">
-          Servicios
+          Servicios y planes
         </p>
-        <h2 className="mt-3 text-3xl font-bold tracking-tight text-zinc-50 md:text-5xl">
-          Nuestros planes
+        <h2
+          id="servicios-titulo"
+          className="mt-3 text-3xl font-bold tracking-tight text-balance text-zinc-50 md:text-5xl"
+        >
+          Elegí el proyecto que necesitás
         </h2>
+        <p className="mx-auto mt-4 max-w-xl text-base text-zinc-300">
+          El precio depende de cada proyecto. Escribinos por WhatsApp y te
+          armamos un presupuesto.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
-        {/* Plan Landing Page — pequeña (2/6) */}
-        <article className={cn(planCard, "min-h-[240px] md:col-span-2")}>
-          <div className={iconBox}>
-            <Rocket size={20} />
-          </div>
-          <div className="mt-10">
-            <h3 className="text-xl font-semibold text-zinc-50">
-              Plan Landing Page
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-              Ideal para presencia rápida.
-            </p>
-          </div>
-        </article>
+        {PLANS.map((plan) => (
+          <PlanCard key={plan.id} plan={plan} />
+        ))}
+      </div>
 
-        {/* A Medida — destacada (4/6) */}
-        <article
-          className={cn(
-            planCard,
-            "min-h-[240px] border-cyan-300/30 shadow-[0_0_60px_-15px_rgba(34,211,238,0.45)] hover:border-cyan-300/50 md:col-span-4",
-          )}
-        >
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/15 blur-3xl"
-          />
-          <div className="relative flex items-start justify-between">
-            <div className={cn(iconBox, "border-cyan-300/30 text-cyan-200")}>
-              <Sparkles size={20} />
-            </div>
-            <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-medium text-cyan-200">
-              Destacado
-            </span>
-          </div>
-          <div className="relative mt-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-            <div className="max-w-md">
-              <h3 className="text-2xl font-semibold text-zinc-50">A Medida</h3>
-              <p className="mt-2 text-sm leading-relaxed text-zinc-300">
-                Desarrollos complejos, bases de datos e integraciones. Hablá con
-                Santiago para cotizar tu idea.
-              </p>
-            </div>
-            <MagneticWrap className="shrink-0 self-start md:self-auto">
-              <OriginButton
-                variant="solid"
-                onClick={() =>
-                  openWhatsApp(
-                    "Hola Santiago! Quiero cotizar un desarrollo a medida.",
-                  )
-                }
-              >
-                Cotizar por WhatsApp
-              </OriginButton>
-            </MagneticWrap>
-          </div>
-        </article>
-
-        {/* Plan E-commerce — mediana (3/6) */}
-        <article className={cn(planCard, "min-h-[240px] md:col-span-3")}>
-          <div className={iconBox}>
-            <ShoppingBag size={20} />
-          </div>
-          <div className="mt-10">
-            <h3 className="text-xl font-semibold text-zinc-50">
-              Plan E-commerce
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-              Para tiendas y catálogos físicos.
-            </p>
-          </div>
-        </article>
-
-        {/* Plan Profesional — mediana (3/6) */}
-        <article className={cn(planCard, "min-h-[240px] md:col-span-3")}>
-          <div className={iconBox}>
-            <CalendarCheck size={20} />
-          </div>
-          <div className="mt-10">
-            <h3 className="text-xl font-semibold text-zinc-50">
-              Plan Profesional
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-              Sitios multisección con reservas o turnos.
-            </p>
-          </div>
-        </article>
+      <div className="mt-20">
+        <div className="mb-8 text-center">
+          <h3 className="text-2xl font-bold tracking-tight text-balance text-zinc-50 md:text-3xl">
+            ¿No sabés cuál elegir?
+          </h3>
+          <p className="mx-auto mt-3 max-w-xl text-base text-zinc-300">
+            Marcá lo que necesitás y te mostramos qué tipo de proyecto encaja.
+          </p>
+        </div>
+        <div className="mx-auto max-w-4xl">
+          <PlanFinder />
+        </div>
       </div>
     </div>
   </section>
 );
 
+/* ---------- Portfolio ---------- */
+
 const Portfolio: React.FC = () => (
-  <section id="portfolio" className="relative px-4 py-24 md:px-8">
+  <section
+    id="portfolio"
+    aria-labelledby="portfolio-titulo"
+    className="relative px-4 py-24 md:px-8"
+  >
     <div className="mx-auto max-w-6xl">
       <div className="mb-6 text-center">
         <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300/70">
           Portfolio
         </p>
-        <h2 className="mt-3 text-3xl font-bold tracking-tight text-zinc-50 md:text-5xl">
-          Nuestras Demos
+        <h2
+          id="portfolio-titulo"
+          className="mt-3 text-3xl font-bold tracking-tight text-balance text-zinc-50 md:text-5xl"
+        >
+          Nuestras demos
         </h2>
+        <p className="mx-auto mt-4 max-w-xl text-base text-zinc-300">
+          Deslizá las tarjetas o usá las flechas para recorrer los proyectos.
+        </p>
       </div>
       <CardDeckCarousel
         slides={DEMO_SLIDES}
-        height="min(92svh, 860px)"
         cardWidth="min(78vw, 400px)"
         aspect="3 / 4"
         scatter={8}
@@ -1757,6 +2279,102 @@ const Portfolio: React.FC = () => (
     </div>
   </section>
 );
+
+/* ---------- Quiénes somos ---------- */
+
+const AboutUs: React.FC = () => (
+  <section
+    id="quienes-somos"
+    aria-labelledby="quienes-titulo"
+    className="relative px-4 py-24 md:px-8"
+  >
+    <div className="mx-auto grid max-w-6xl gap-14 lg:grid-cols-12 lg:gap-10">
+      <div className="lg:col-span-6">
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300/70">
+          Quiénes somos
+        </p>
+        <h2
+          id="quienes-titulo"
+          className="mt-3 text-3xl font-bold tracking-tight text-balance text-zinc-50 md:text-5xl"
+        >
+          Detrás de VisoTech estamos Santiago y Victoria
+        </h2>
+        <div className="mt-8 max-w-xl space-y-5 text-base leading-relaxed text-zinc-300">
+          <p>
+            Somos egresados de la Tecnicatura Universitaria en Programación de
+            la UTN de San Rafael. Nos une el interés por la tecnología, el
+            diseño y las experiencias digitales que aportan valor de verdad.
+          </p>
+          <p>
+            Desarrollamos páginas web visuales, modernas y adaptadas a cada
+            negocio o proyecto. Combinamos programación, creatividad y atención
+            al detalle para que tu idea comunique mejor y deje una buena primera
+            impresión.
+          </p>
+          <p>
+            Creemos que una buena página no tiene que ser complicada: tiene que
+            tener identidad propia, ser fácil de usar y mostrar lo importante
+            con claridad.
+          </p>
+        </div>
+      </div>
+
+      <div className="relative pb-16 lg:col-span-6 lg:self-center">
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-4 bottom-0 h-44 rounded-[28px] bg-cyan-300 shadow-[0_40px_80px_-16px_rgba(34,211,238,0.55)]"
+        />
+        <ul className="relative z-10 grid gap-4">
+          {CONTACTS.map((person) => (
+            <li
+              key={person.id}
+              className="rounded-[28px] border border-white/10 bg-[radial-gradient(120%_120%_at_30%_10%,#1a1a1a_0%,#0f0f10_60%,#0b0b0c_100%)] p-6 shadow-2xl sm:p-8"
+            >
+              <p className="mb-6 flex items-center gap-2 text-sm text-zinc-300">
+                <GraduationCap size={16} aria-hidden="true" />
+                {person.graduate} de la UTN San Rafael
+              </p>
+              <div className="flex items-center gap-5">
+                <span
+                  aria-hidden="true"
+                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/5 text-2xl font-semibold text-zinc-50 ring-2 ring-white/10"
+                >
+                  {person.initial}
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-xl font-semibold tracking-tight text-zinc-50 sm:text-2xl">
+                    {person.name}
+                  </h3>
+                  <p className="mt-0.5 text-sm text-zinc-400">
+                    Tecnicatura Universitaria en Programación
+                  </p>
+                </div>
+              </div>
+              <a
+                href={waLink(person.id)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  "mt-6 flex h-12 w-full items-center justify-start gap-3 rounded-2xl bg-white/10 px-4 text-sm font-medium text-white transition-colors hover:bg-white/15",
+                  focusRing,
+                )}
+              >
+                <MessageCircle size={16} aria-hidden="true" />
+                Escribir a {person.name}
+              </a>
+            </li>
+          ))}
+        </ul>
+        <div className="absolute inset-x-0 bottom-0 flex h-16 items-center justify-center gap-2 px-6 text-center text-sm font-medium text-neutral-950">
+          <Zap size={16} aria-hidden="true" className="shrink-0" />
+          Programación, creatividad y atención al detalle
+        </div>
+      </div>
+    </div>
+  </section>
+);
+
+/* ---------- Contacto + footer ---------- */
 
 const WaveSvg: React.FC<{ className: string }> = ({ className }) => (
   <svg
@@ -1772,111 +2390,147 @@ const WaveSvg: React.FC<{ className: string }> = ({ className }) => (
   </svg>
 );
 
-const AnimatedWaveFooter: React.FC = () => (
-  <footer className="relative overflow-hidden bg-gradient-to-b from-black via-black to-cyan-950/20 pt-24">
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-      <div
-        className="absolute bottom-0 left-0 flex h-[420px] w-[3600px]"
-        style={{ animation: "vt-wave 40s linear infinite reverse" }}
-      >
-        <WaveSvg className="text-slate-700/20" />
-        <WaveSvg className="text-slate-700/20" />
-      </div>
-      <div
-        className="absolute bottom-0 left-0 flex h-[340px] w-[3600px]"
-        style={{ animation: "vt-wave 28s linear infinite" }}
-      >
-        <WaveSvg className="text-cyan-900/25" />
-        <WaveSvg className="text-cyan-900/25" />
-      </div>
-    </div>
-
-    <div className="relative z-10 mx-auto max-w-6xl px-4 pb-32 md:px-8">
-      <div className="grid gap-12 lg:grid-cols-2">
-        <div>
-          <h2 className="max-w-md text-3xl font-bold tracking-tight text-zinc-50 md:text-4xl">
-            ¿Listo para digitalizar tu negocio?
-          </h2>
-          <div className="mt-8">
-            <MagneticWrap>
-              <OriginButton
-                variant="outline"
-                size="xl"
-                onClick={() => openWhatsApp()}
-              >
-                Escribinos al WhatsApp
-              </OriginButton>
-            </MagneticWrap>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-8">
-          <div>
-            <h3 className="mb-4 text-lg font-semibold text-zinc-50">Enlaces</h3>
-            <nav className="space-y-2 text-sm text-zinc-400">
-              <a href="#inicio" className="block transition-colors hover:text-cyan-200">
-                Inicio
-              </a>
-              <a href="#servicios" className="block transition-colors hover:text-cyan-200">
-                Servicios
-              </a>
-              <a href="#portfolio" className="block transition-colors hover:text-cyan-200">
-                Nuestras Demos
-              </a>
-              <a
-                href={waLink("Hola Santiago! Quiero hacer una consulta comercial.")}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block transition-colors hover:text-cyan-200"
-              >
-                Santiago · Ventas y cotizaciones
-              </a>
-            </nav>
-          </div>
-          <div>
-            <h3 className="mb-4 text-lg font-semibold text-zinc-50">Contacto</h3>
-            <address className="space-y-2 text-sm not-italic text-zinc-400">
-              <p>San Rafael, Mendoza</p>
-              <p>Argentina</p>
-              <a
-                href={waLink()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block transition-colors hover:text-cyan-200"
-              >
-                WhatsApp
-              </a>
-            </address>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-16 border-t border-white/10 pt-8 text-center">
-        <p className="text-sm text-zinc-500">
-          © {new Date().getFullYear()} VisoTech. Todos los derechos reservados.
-        </p>
-      </div>
-    </div>
-  </footer>
+const footerLink = cn(
+  "block rounded-md py-1 transition-colors hover:text-cyan-200",
+  focusRing,
 );
 
+const AnimatedWaveFooter: React.FC = () => {
+  const [footerRef, inView] = useInView<HTMLElement>();
+
+  return (
+    <footer
+      ref={footerRef}
+      className={cn(
+        "relative overflow-hidden bg-gradient-to-b from-black via-black to-cyan-950/20 pt-24",
+        !inView && "vt-paused",
+      )}
+    >
+      <div
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        aria-hidden="true"
+      >
+        <div className="vt-wave-a absolute bottom-0 left-0 flex h-[420px] w-[3600px]">
+          <WaveSvg className="text-slate-700/20" />
+          <WaveSvg className="text-slate-700/20" />
+        </div>
+        <div className="vt-wave-b absolute bottom-0 left-0 flex h-[340px] w-[3600px]">
+          <WaveSvg className="text-cyan-900/25" />
+          <WaveSvg className="text-cyan-900/25" />
+        </div>
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-6xl px-4 pb-32 md:px-8">
+        <div className="grid gap-12 lg:grid-cols-2">
+          <section id="contacto" aria-labelledby="contacto-titulo">
+            <h2
+              id="contacto-titulo"
+              className="max-w-md text-3xl font-bold tracking-tight text-balance text-zinc-50 md:text-4xl"
+            >
+              ¿Hablamos de tu proyecto?
+            </h2>
+            <p className="mt-4 max-w-md text-base leading-relaxed text-zinc-300">
+              Escribinos por WhatsApp a Santiago o a Victoria. Contanos qué
+              necesitás y vemos cómo ayudarte.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              {CONTACTS.map((contact) => (
+                <MagneticWrap key={contact.id}>
+                  <OriginButton
+                    variant="solid"
+                    size="lg"
+                    onClick={() => openWhatsApp(contact.id)}
+                    className="w-full sm:w-auto"
+                  >
+                    <MessageCircle size={18} aria-hidden="true" />
+                    Escribir a {contact.name}
+                  </OriginButton>
+                </MagneticWrap>
+              ))}
+            </div>
+          </section>
+
+          <div className="grid grid-cols-2 gap-8">
+            <div>
+              <h3 className="mb-4 text-lg font-semibold text-zinc-50">Enlaces</h3>
+              <nav aria-label="Enlaces del sitio" className="space-y-1 text-sm text-zinc-400">
+                <a href="#inicio" className={footerLink}>
+                  Inicio
+                </a>
+                <a href="#servicios" className={footerLink}>
+                  Servicios y planes
+                </a>
+                <a href="#portfolio" className={footerLink}>
+                  Nuestras demos
+                </a>
+                <a href="#quienes-somos" className={footerLink}>
+                  Quiénes somos
+                </a>
+                <a href="#contacto" className={footerLink}>
+                  Contacto
+                </a>
+              </nav>
+            </div>
+            <div>
+              <h3 className="mb-4 text-lg font-semibold text-zinc-50">WhatsApp</h3>
+              <address className="space-y-1 text-sm not-italic text-zinc-400">
+                {CONTACTS.map((contact) => (
+                  <a
+                    key={contact.id}
+                    href={waLink(contact.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={footerLink}
+                  >
+                    Escribir a {contact.name}
+                  </a>
+                ))}
+                <p className="pt-3">San Rafael, Mendoza</p>
+                <p>Argentina</p>
+              </address>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-16 border-t border-white/10 pt-8 text-center">
+          <p className="text-sm text-zinc-400">
+            © {new Date().getFullYear()} VisoTech. Todos los derechos reservados.
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+};
+
 /* ============================================================
-   PAGE 
+   PAGE
    ============================================================ */
 
 export default function Page() {
   return (
-    <MagneticCursor contrastBoost={1.2} cursorSize={28} blendMode="exclusion">
-      <style>{GLOBAL_CSS}</style>
-      <div className="dark relative min-h-screen bg-black text-zinc-50 antialiased">
-        <main>
-          <Hero />
-          <ServicesGrid />
-          <Portfolio />
-        </main>
-        <AnimatedWaveFooter />
-        <MinimalistDock />
-      </div>
-    </MagneticCursor>
+    <MotionConfig reducedMotion="user">
+      <MagneticCursor contrastBoost={1.2} cursorSize={28} blendMode="exclusion">
+        <style>{GLOBAL_CSS}</style>
+        <div className="dark relative min-h-screen overflow-x-clip bg-black text-zinc-50 antialiased">
+          <a
+            href="#contenido"
+            className={cn(
+              "sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-neutral-950",
+              focusRing,
+            )}
+          >
+            Saltar al contenido
+          </a>
+          <main id="contenido">
+            <Hero />
+            <ServicesGrid />
+            <Portfolio />
+            <AboutUs />
+          </main>
+          <AnimatedWaveFooter />
+          <MinimalistDock />
+        </div>
+      </MagneticCursor>
+    </MotionConfig>
   );
 }
