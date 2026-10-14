@@ -1230,7 +1230,7 @@ function pad2(n: number): string {
 const DEMO_SLIDES: Slide[] = [
   {
     image: "/imagen1.png",
-    href: "https://carnetmanipulacionalimentos.netlify.app",
+    href: "https://carolinagarcia.com.ar",
     title: "Carnet de Manipulación de Alimentos",
     caption: "Landing de un curso de certificación en San Rafael.",
     alt: "Captura de la landing del Carnet de Manipulación de Alimentos",
