@@ -1,14 +1,12 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-// Dependencias: npm i gsap vecteur lucide-react framer-motion
+// Dependencias: npm i lucide-react framer-motion
 // Requiere: Next.js (App Router) + TypeScript + Tailwind CSS 4
 // Imágenes del portfolio: public/imagen1.png ... public/imagen4.png
 
 import * as React from "react";
-import gsap from "gsap";
 import { useState, useEffect } from "react";
-import { vec2 } from "vecteur";
 import { motion, MotionConfig, type Variants } from "framer-motion";
 import {
   Home,
@@ -510,7 +508,7 @@ const MagneticWrap: React.FC<{ children: React.ReactNode; className?: string }> 
 );
 
 /* ============================================================
-   AURORA BACKGROUND
+   AURORA BACKGROUND (solo para el Hero)
    ============================================================ */
 
 interface AuroraBackgroundProps {
@@ -635,6 +633,239 @@ const AuroraBackground: React.FC<AuroraBackgroundProps> = ({
 
       <div className="relative z-10 w-full">{children}</div>
     </div>
+  );
+};
+
+/* ============================================================
+   MIST BACKGROUND (shader WebGL "mist" en violeta)
+   Se usa como fondo fijo desde "Servicios y planes" hacia abajo.
+   ============================================================ */
+
+const MIST_VERTEX = `
+  attribute vec2 a_position;
+  varying vec2 v_uv;
+  void main() {
+    v_uv = a_position * 0.5 + 0.5;
+    gl_Position = vec4(a_position, 0.0, 1.0);
+  }
+`;
+
+const MIST_FRAGMENT = `
+  #ifdef GL_FRAGMENT_PRECISION_HIGH
+  precision highp float;
+  #else
+  precision mediump float;
+  #endif
+
+  varying vec2 v_uv;
+  uniform float u_time;
+  uniform vec2 u_resolution;
+
+  #define TWO_PI 6.28318530718
+  #define PI 3.14159265358979323846
+
+  float random(vec2 st) {
+    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+  }
+
+  float noise(vec2 st) {
+    vec2 i = floor(st);
+    vec2 f = fract(st);
+    float a = random(i);
+    float b = random(i + vec2(1.0, 0.0));
+    float c = random(i + vec2(0.0, 1.0));
+    float d = random(i + vec2(1.0, 1.0));
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    float x1 = mix(a, b, u.x);
+    float x2 = mix(c, d, u.x);
+    return mix(x1, x2, u.y);
+  }
+
+  void main() {
+      vec2 uv = v_uv;
+
+      float t = u_time * 0.975 - 1.175;
+
+      float noise_scale = 0.00338;
+
+      uv -= 0.5;
+      uv *= (noise_scale * u_resolution);
+      uv /= 1.5;
+      uv += 0.5;
+
+      float n1 = noise(uv * 1.0 + t);
+      float n2 = noise(uv * 2.0 - t);
+      float angle = n1 * TWO_PI;
+      uv.x += 0.32 * n2 * cos(angle);
+      uv.y += 0.32 * n2 * sin(angle);
+
+      for (int i = 1; i <= 5; i++) {
+          float fi = float(i);
+          uv.x += 0.65 / fi * cos(t + fi * 1.5 * uv.y);
+          uv.y += 0.65 / fi * cos(t + fi * 1.0 * uv.x);
+      }
+
+      float sh = 1.0 - uv.y;
+      sh -= 0.5;
+      sh /= (noise_scale * u_resolution.y);
+      sh += 0.5;
+
+      float shape_scaling = 0.104;
+      float shape = smoothstep(0.45 - shape_scaling, 0.55 + shape_scaling, sh + 0.3 * (0.33 - 0.5));
+      float mixer = shape;
+
+      // Fondo casi negro y niebla violeta (#A855F7) para combinar con el resto del sitio
+      vec3 bg = vec3(0.0196, 0.0196, 0.0196);
+      vec3 pink = vec3(0.659, 0.333, 0.969);
+
+      float mistFocus = pow(sin(mixer * PI), 4.2);
+
+      float fineMist = noise(uv * 3.5 - t * 1.3) * 0.4 + noise(uv * 1.5 + t * 0.85) * 0.6;
+      float combinedDensity = mix(mixer, fineMist, 0.28) * mistFocus;
+
+      vec3 col = mix(bg, pink, smoothstep(0.0, 0.85, combinedDensity));
+
+      float highlight = smoothstep(0.42, 0.88, fineMist) * smoothstep(0.12, 0.9, mixer) * mistFocus;
+      col = mix(col, pink * 1.15, highlight * 0.35);
+
+      vec2 raySource = vec2(0.2, 1.25);
+      vec2 rayDir = normalize(v_uv - raySource);
+      float rayAngle = atan(rayDir.y, rayDir.x);
+
+      float rays = sin(rayAngle * 6.5 + t * 0.35) * 0.35 +
+                   sin(rayAngle * 12.0 - t * 0.22) * 0.25 +
+                   sin(rayAngle * 24.0 + t * 0.15) * 0.15;
+      rays = smoothstep(0.15, 0.82, rays * 0.5 + 0.5);
+
+      float rayGlow = rays * smoothstep(0.15, 0.9, combinedDensity) * (1.1 - v_uv.y) * mistFocus * 0.7;
+      col += pink * rayGlow * 0.38;
+
+      float grain = random(gl_FragCoord.xy * 0.15 + t * 0.05);
+      float particles = step(0.988, grain) * smoothstep(0.2, 0.9, combinedDensity);
+      col += pink * particles * 0.32;
+
+      col = pow(col, vec3(0.92));
+
+      gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+const MistBackground: React.FC<{ speed?: number; opacity?: number }> = ({
+  speed = 0.6,
+  opacity = 0.7,
+}) => {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+  React.useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const gl = canvas.getContext("webgl", {
+      antialias: false,
+      alpha: false,
+      preserveDrawingBuffer: false,
+    });
+    if (!gl) return;
+
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const compile = (type: number, source: string) => {
+      const shader = gl.createShader(type);
+      if (!shader) return null;
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    };
+
+    const vs = compile(gl.VERTEX_SHADER, MIST_VERTEX);
+    const fs = compile(gl.FRAGMENT_SHADER, MIST_FRAGMENT);
+    if (!vs || !fs) {
+      if (vs) gl.deleteShader(vs);
+      if (fs) gl.deleteShader(fs);
+      return;
+    }
+
+    const program = gl.createProgram();
+    if (!program) {
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+      return;
+    }
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error(gl.getProgramInfoLog(program));
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+      gl.deleteProgram(program);
+      return;
+    }
+    gl.useProgram(program);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+      gl.STATIC_DRAW,
+    );
+    const positionLocation = gl.getAttribLocation(program, "a_position");
+    gl.enableVertexAttribArray(positionLocation);
+    gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+    const timeLocation = gl.getUniformLocation(program, "u_time");
+    const resolutionLocation = gl.getUniformLocation(program, "u_resolution");
+
+    const startTime = performance.now();
+    let raf = 0;
+
+    const draw = (seconds: number) => {
+      gl.uniform1f(timeLocation, seconds * speed);
+      gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    };
+
+    const resize = () => {
+      // Resolución reducida: es un fondo difuso y así pesa menos en celulares.
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+      canvas.width = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+      canvas.height = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      if (reduce) draw(8);
+    };
+
+    const loop = () => {
+      if (!document.hidden) draw((performance.now() - startTime) / 1000);
+      raf = requestAnimationFrame(loop);
+    };
+
+    resize();
+    window.addEventListener("resize", resize);
+    if (!reduce) loop();
+
+    return () => {
+      window.removeEventListener("resize", resize);
+      cancelAnimationFrame(raf);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
+      gl.deleteProgram(program);
+      gl.deleteBuffer(buffer);
+    };
+  }, [speed]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      className="absolute inset-0 h-full w-full"
+      style={{ opacity }}
+    />
   );
 };
 
@@ -1906,10 +2137,6 @@ const ServicesGrid: React.FC = () => (
     aria-labelledby="servicios-titulo"
     className="relative px-4 py-24 md:px-8"
   >
-    <div
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(79,70,229,0.12),transparent_60%)]"
-    />
     <div className="relative mx-auto max-w-6xl">
       <div className="mb-12 text-center">
         <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300/70">
@@ -2104,16 +2331,17 @@ const footerLink = cn(
 const AnimatedWaveFooter: React.FC = () => {
   const [year, setYear] = useState(2026);
 
-useEffect(() => {
-  setYear(new Date().getFullYear());
-}, []);
+  useEffect(() => {
+    setYear(new Date().getFullYear());
+  }, []);
+
   const [footerRef, inView] = useInView<HTMLElement>();
 
   return (
     <footer
       ref={footerRef}
       className={cn(
-        "relative overflow-hidden bg-gradient-to-b from-black via-black to-cyan-950/20 pt-24",
+        "relative overflow-hidden bg-gradient-to-b from-transparent via-black/30 to-cyan-950/30 pt-24",
         !inView && "vt-paused",
       )}
     >
@@ -2215,6 +2443,8 @@ useEffect(() => {
 
 /* ============================================================
    PAGE
+   El fondo "mist" es sticky dentro de este contenedor: el Hero lo tapa
+   con su propio fondo y aparece recién desde "Servicios y planes" hacia abajo.
    ============================================================ */
 
 export default function Page() {
@@ -2232,13 +2462,28 @@ export default function Page() {
           >
             Saltar al contenido
           </a>
-          <main id="contenido">
-            <Hero />
-            <ServicesGrid />
-            <Portfolio />
-            <AboutUs />
-          </main>
-          <AnimatedWaveFooter />
+
+          <div className="relative">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none sticky top-0 z-0 -mb-[100svh] h-svh w-full overflow-hidden bg-black"
+            >
+              <MistBackground speed={0.6} opacity={0.7} />
+              {/* Velo oscuro para que el texto se lea bien sobre la niebla */}
+              <div className="absolute inset-0 bg-black/40" />
+            </div>
+
+            <div className="relative z-10">
+              <main id="contenido">
+                <Hero />
+                <ServicesGrid />
+                <Portfolio />
+                <AboutUs />
+              </main>
+              <AnimatedWaveFooter />
+            </div>
+          </div>
+
           <MinimalistDock />
         </div>
       </StaticCursor>
