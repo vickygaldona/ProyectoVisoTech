@@ -7,6 +7,7 @@
 
 import * as React from "react";
 import gsap from "gsap";
+import { useState, useEffect } from "react";
 import { vec2 } from "vecteur";
 import { motion, MotionConfig, type Variants } from "framer-motion";
 import {
@@ -2101,6 +2102,11 @@ const footerLink = cn(
 );
 
 const AnimatedWaveFooter: React.FC = () => {
+  const [year, setYear] = useState(2026);
+
+useEffect(() => {
+  setYear(new Date().getFullYear());
+}, []);
   const [footerRef, inView] = useInView<HTMLElement>();
 
   return (
@@ -2199,7 +2205,7 @@ const AnimatedWaveFooter: React.FC = () => {
 
         <div className="mt-16 border-t border-white/10 pt-8 text-center">
           <p className="text-sm text-zinc-400">
-            © {new Date().getFullYear()} VisoTech. Todos los derechos reservados.
+            © {year} VisoTech. Todos los derechos reservados.
           </p>
         </div>
       </div>
