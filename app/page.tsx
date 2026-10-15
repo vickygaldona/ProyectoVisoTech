@@ -23,6 +23,7 @@ import {
   Zap,
   GraduationCap,
   SlidersHorizontal,
+  FileText,
 } from "lucide-react";
 
 /* ============================================================
@@ -1622,6 +1623,8 @@ type Plan = {
   topic: string;
   featured?: boolean;
   span: string;
+  /** Ruta del PDF de la propuesta (archivo dentro de public/propuestas/) */
+  pdf: string;
 };
 
 const PLANS: Plan[] = [
@@ -1642,6 +1645,7 @@ const PLANS: Plan[] = [
     topic: "una landing page para mi negocio",
     featured: true,
     span: "md:col-span-4",
+    pdf: "/propuestas/01-Landing-page-para-negocios.pdf",
   },
   {
     id: "invitacion",
@@ -1656,6 +1660,7 @@ const PLANS: Plan[] = [
     ],
     topic: "una invitación digital para un evento",
     span: "md:col-span-2",
+    pdf: "/propuestas/02-Invitacion-digital-para-eventos.pdf",
   },
   {
     id: "carta",
@@ -1673,6 +1678,7 @@ const PLANS: Plan[] = [
     note: "Es una carta para ver y consultar: no incluye pagos ni pedidos online.",
     topic: "una carta o catálogo digital",
     span: "md:col-span-3",
+    pdf: "/propuestas/03-Carta-o-catalogo-digital.pdf",
   },
   {
     id: "personalizada",
@@ -1690,6 +1696,7 @@ const PLANS: Plan[] = [
     note: "Nos enfocamos en diseño y frontend: sin login, paneles de administración ni pagos.",
     topic: "un proyecto web personalizado",
     span: "md:col-span-3",
+    pdf: "/propuestas/04-Proyecto-personalizado.pdf",
   },
 ];
 
@@ -1787,6 +1794,19 @@ const PlanCard: React.FC<{ plan: Plan }> = ({ plan }) => {
       </div>
 
       <div className="relative mt-auto border-t border-white/10 pt-5">
+        <a
+          href={plan.pdf}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Ver la propuesta de ${plan.title} en PDF (se abre en una pestaña nueva)`}
+          className={cn(
+            "mb-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-neutral-950 transition-colors hover:bg-zinc-200",
+            focusRing,
+          )}
+        >
+          <FileText size={16} aria-hidden="true" />
+          Ver propuesta
+        </a>
         <p className="text-sm font-medium text-zinc-100">Consultar presupuesto</p>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           {CONTACTS.map((contact) => (
