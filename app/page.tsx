@@ -5,6 +5,7 @@
 // Requiere: Next.js (App Router) + TypeScript + Tailwind CSS 4
 // Imágenes del portfolio: public/imagen1.png ... public/imagen4.png
 
+import Link from "next/link";
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { motion, MotionConfig, type Variants } from "framer-motion";
@@ -2435,6 +2436,12 @@ const AnimatedWaveFooter: React.FC = () => {
                 <a href="#contacto" className={footerLink}>
                   Contacto
                 </a>
+                <Link href="/privacidad" className={footerLink}>
+                  Política de privacidad
+                </Link>
+                <Link href="/terminos" className={footerLink}>
+                  Términos y condiciones
+                </Link>
               </nav>
             </div>
             <div>
