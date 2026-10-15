@@ -1194,6 +1194,13 @@ const DEMO_SLIDES: Slide[] = [
     caption: "Invitación digital para eventos.",
     alt: "Captura de la invitación digital de bautismo",
   },
+  {
+    image: "/imagen5.png",
+    href: "https://vivero-el-paraiso.netlify.app",
+    title: "Vivero El Paraíso",
+    caption: "Sitio web con catálogo de plantas de vid y frutos secos.",
+    alt: "Captura del sitio web de Vivero El Paraíso",
+  },
 ];
 
 const CD_CSS = [
