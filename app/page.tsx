@@ -1,18 +1,19 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-// Dependencias: npm i lucide-react framer-motion
+// Dependencias: npm i lucide-react framer-motion @next/third-parties
 // Requiere: Next.js (App Router) + TypeScript + Tailwind CSS 4
-// Imágenes del portfolio: public/imagen1.png ... public/imagen4.png
+// Imágenes del portfolio: public/imagen1.png ... public/imagen5.png
 
+import Image from "next/image";
 import Link from "next/link";
 import * as React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, MotionConfig, type Variants } from "framer-motion";
 import {
   Home,
   LayoutGrid,
   Layers,
+  MessageSquare,
   MessageCircle,
   Rocket,
   Utensils,
@@ -70,7 +71,16 @@ const waLink = (id: ContactId, topic: string = DEFAULT_TOPIC) => {
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
 };
 
+type GtagFn = (...args: unknown[]) => void;
+
+/** Envía un evento a GA4 solo si Analytics está cargado (sin ID configurado, no hace nada). */
+const track = (event: string, params?: Record<string, string>) => {
+  const gtag = (window as unknown as { gtag?: GtagFn }).gtag;
+  if (typeof gtag === "function") gtag("event", event, params);
+};
+
 const openWhatsApp = (id: ContactId, topic?: string) => {
+  track("whatsapp_click", { contact: id, source: "button" });
   window.open(waLink(id, topic), "_blank", "noopener,noreferrer");
 };
 
@@ -86,22 +96,235 @@ const cn = (...classes: Array<string | false | null | undefined>) =>
 
 const focusRing =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
+/* ---------- Formulario de consulta (validación + anti-spam) ---------- */
 
+const FORM_TOPICS = [
+  "una landing page para mi negocio",
+  "una invitación digital para un evento",
+  "una carta o catálogo digital",
+  "otra cosa",
+] as const;
+
+const MIN_FILL_MS = 3000;
+
+const cleanText = (s: string) => s.replace(/\p{Cc}+/gu, " ").replace(/\s+/g, " ").trim();
+
+type FormErrors = { name?: string; message?: string };
+
+const validateForm = (name: string, message: string): FormErrors => {
+  const errors: FormErrors = {};
+  if (name.length < 2) errors.name = "Escribí tu nombre (mínimo 2 letras).";
+  else if (name.length > 60) errors.name = "El nombre es demasiado largo (máximo 60).";
+
+  if (message.length < 10) errors.message = "Contanos un poco más (mínimo 10 caracteres).";
+  else if (message.length > 500) errors.message = "El mensaje es muy largo (máximo 500).";
+  else if (/https?:\/\/|www\./i.test(message))
+    errors.message = "Por seguridad, no se permiten links en el mensaje.";
+  return errors;
+};
+
+const fieldClass =
+  "w-full rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-base text-zinc-50 placeholder:text-zinc-400 " +
+  focusRing;
+
+function ContactForm() {
+  const [name, setName] = useState("");
+  const [message, setMessage] = useState("");
+  const [topic, setTopic] = useState<string>(FORM_TOPICS[0]);
+  const [contactId, setContactId] = useState<ContactId>(CONTACTS[0].id);
+  const [website, setWebsite] = useState(""); // honeypot: las personas no lo ven
+  const [submitted, setSubmitted] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [tooFast, setTooFast] = useState(false);
+  const startedAt = useRef(0);
+
+  useEffect(() => {
+    startedAt.current = Date.now();
+  }, []);
+
+  const cleanName = cleanText(name);
+  const cleanMessage = cleanText(message);
+  const errors = submitted ? validateForm(cleanName, cleanMessage) : {};
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitted(true);
+    setTooFast(false);
+
+    if (Object.keys(validateForm(cleanName, cleanMessage)).length > 0) return;
+
+    // Anti-spam 1: si el campo trampa tiene algo, es un bot. Fingimos éxito y no hacemos nada.
+    if (website) {
+      setSent(true);
+      return;
+    }
+    // Anti-spam 2: un humano tarda más de unos segundos en completarlo.
+    if (Date.now() - startedAt.current < MIN_FILL_MS) {
+      setTooFast(true);
+      return;
+    }
+
+    const { name: contactName, number } = getContact(contactId);
+    const text = `Hola ${contactName}! Soy ${cleanName}. Escribo desde la web de VisoTech. Quiero consultar por ${topic}. ${cleanMessage}`;
+    track("whatsapp_click", { contact: contactId, source: "form" });
+    track("form_submit", { contact: contactId });
+    window.open(
+      `https://wa.me/${number}?text=${encodeURIComponent(text)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+    setSent(true);
+  };
+
+  return (
+    <section id="consulta" className="px-5 py-20">
+      <div className="mx-auto max-w-xl">
+        <p className="text-center text-sm font-medium uppercase tracking-[0.2em] text-cyan-300">
+          Consulta
+        </p>
+        <h2 className="mt-3 text-center text-3xl font-semibold text-balance text-zinc-50">
+          Contanos qué necesitás
+        </h2>
+        <p className="mt-3 text-center text-zinc-300">
+          Completá el formulario y se abre WhatsApp con tu mensaje listo para enviar.
+        </p>
+
+        {sent ? (
+          <div role="status" className="mt-8 rounded-2xl border border-cyan-300/30 bg-cyan-300/10 p-6 text-center text-zinc-50">
+            ¡Listo! Se abrió WhatsApp con tu consulta. Solo falta que toques enviar.
+            <button
+              type="button"
+              onClick={() => {
+                setSent(false);
+                setSubmitted(false);
+                setMessage("");
+              }}
+              className={cn("mt-4 block w-full text-sm text-cyan-200 underline", focusRing)}
+            >
+              Hacer otra consulta
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
+            <div>
+              <label htmlFor="cf-name" className="mb-1.5 block text-sm font-medium text-zinc-200">
+                Tu nombre
+              </label>
+              <input
+                id="cf-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={80}
+                autoComplete="name"
+                aria-invalid={errors.name ? true : undefined}
+                aria-describedby={errors.name ? "cf-name-err" : undefined}
+                className={fieldClass}
+              />
+              {errors.name ? (
+                <p id="cf-name-err" className="mt-1.5 text-sm text-red-300">{errors.name}</p>
+              ) : null}
+            </div>
+
+            <div>
+              <label htmlFor="cf-topic" className="mb-1.5 block text-sm font-medium text-zinc-200">
+                ¿Qué necesitás?
+              </label>
+              <select id="cf-topic" value={topic} onChange={(e) => setTopic(e.target.value)} className={fieldClass}>
+                {FORM_TOPICS.map((t) => (
+                  <option key={t} value={t} className="bg-neutral-900">{t}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="cf-contact" className="mb-1.5 block text-sm font-medium text-zinc-200">
+                ¿Con quién querés hablar?
+              </label>
+              <select
+                id="cf-contact"
+                value={contactId}
+                onChange={(e) => setContactId(e.target.value as ContactId)}
+                className={fieldClass}
+              >
+                {CONTACTS.map((c) => (
+                  <option key={c.id} value={c.id} className="bg-neutral-900">{c.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="cf-message" className="mb-1.5 block text-sm font-medium text-zinc-200">
+                Tu mensaje
+              </label>
+              <textarea
+                id="cf-message"
+                rows={4}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                maxLength={600}
+                aria-invalid={errors.message ? true : undefined}
+                aria-describedby={errors.message ? "cf-message-err" : undefined}
+                className={fieldClass}
+              />
+              <div className="mt-1.5 flex justify-between gap-3 text-sm">
+                <span id="cf-message-err" className="text-red-300">{errors.message}</span>
+                <span className="shrink-0 text-zinc-400">{cleanMessage.length}/500</span>
+              </div>
+            </div>
+
+            {/* Campo trampa: invisible para personas, los bots lo completan */}
+            <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+              <label htmlFor="cf-website">No completar este campo</label>
+              <input
+                id="cf-website"
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+              />
+            </div>
+
+            {tooFast ? (
+              <p role="alert" className="text-sm text-amber-300">
+                Esperá un par de segundos y volvé a tocar enviar.
+              </p>
+            ) : null}
+
+            <button
+              type="submit"
+              className={cn(
+                "min-h-12 w-full rounded-xl bg-white px-6 py-3 text-base font-semibold text-neutral-950 transition hover:bg-zinc-200",
+                focusRing,
+              )}
+            >
+              Enviar consulta por WhatsApp
+            </button>
+          </form>
+        )}
+      </div>
+    </section>
+  );
+}
 const GLOBAL_CSS = `
 :root{--aurora-color1:rgba(168,85,247,0.2);--aurora-color2:rgba(79,70,229,0.2)}
 html{scroll-behavior:smooth;background:#000}
 @keyframes vt-pulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:.7;transform:scale(1.05)}}
 @keyframes vt-wave{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 @keyframes vt-twinkle{0%,100%{opacity:0}50%{opacity:var(--peak,.6)}}
+@keyframes vt-fade{from{opacity:0}to{opacity:1}}
 .vt-pulse{animation:vt-pulse var(--vt-dur,10s) infinite}
 .vt-star{opacity:0;animation:vt-twinkle var(--vt-dur,3s) ease-in-out var(--vt-delay,0s) infinite}
 .vt-wave-a{animation:vt-wave 40s linear infinite reverse;will-change:transform}
 .vt-wave-b{animation:vt-wave 28s linear infinite;will-change:transform}
+.vt-fade-in{animation:vt-fade 1.2s ease-out both}
 .vt-paused,.vt-paused *{animation-play-state:paused !important}
 html.vt-cursor,html.vt-cursor *{cursor:none !important}
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   .vt-pulse,.vt-wave-a,.vt-wave-b{animation:none}
+  .vt-fade-in{animation:none}
   .vt-star{animation:none;opacity:.35}
 }
 `;
@@ -364,7 +587,7 @@ const OriginButton = React.forwardRef<HTMLButtonElement, OriginButtonProps>(
     const idleClasses =
       variant === "solid"
         ? "border-white/10 bg-white"
-        : "border-white/25 bg-transparent";
+        : "border-white/40 bg-transparent";
     const textClasses =
       variant === "solid"
         ? showFill
@@ -944,6 +1167,12 @@ const dockItems: DockItemData[] = [
     label: "Quiénes somos",
     onClick: () => goTo("quienes-somos"),
   },
+  {
+    id: "consulta",
+    icon: <MessageSquare size={20} />,
+    label: "Consulta",
+    onClick: () => goTo("consulta"),
+  },
 ];
 
 const DockItemComponent: React.FC<{
@@ -1438,7 +1667,7 @@ const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
     "--cd-aspect": aspect,
     "--cd-bg": background,
     "--cd-ink": ink,
-    "--cd-muted": "color-mix(in srgb, var(--cd-ink) 68%, transparent)",
+    "--cd-muted": "color-mix(in srgb, var(--cd-ink) 80%, transparent)",
     "--cd-line": "color-mix(in srgb, var(--cd-ink) 25%, transparent)",
     ...style,
   } as React.CSSProperties;
@@ -1491,13 +1720,16 @@ const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
               onPointerCancel={isTop ? onCancel : undefined}
             >
               {sl.image && !failed[i] ? (
-                <img
+                // next/image sirve la captura en WebP/AVIF y al tamaño que corresponde,
+                // así los PNG originales de /public nunca se descargan completos.
+                <Image
                   data-i={i}
                   src={sl.image}
                   alt={isTop ? sl.alt || sl.title : ""}
+                  fill
+                  sizes="(max-width: 640px) 78vw, 400px"
+                  quality={75}
                   draggable={false}
-                  loading="lazy"
-                  decoding="async"
                   onError={() => markFailed(i)}
                 />
               ) : (
@@ -1565,7 +1797,10 @@ const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
               <OriginButton
                 variant="outline"
                 aria-label={`Ver la demo de ${s.title} (se abre en una pestaña nueva)`}
-                onClick={() => window.open(s.href, "_blank", "noopener,noreferrer")}
+                onClick={() => {
+                  track("demo_click", { demo: s.title });
+                  window.open(s.href, "_blank", "noopener,noreferrer");
+                }}
               >
                 Ver demo ↗
               </OriginButton>
@@ -1602,16 +1837,19 @@ const Hero: React.FC = () => (
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <MagneticWrap>
-            <OriginButton variant="solid" onClick={() => goTo("servicios")}>
-              Ver servicios
-            </OriginButton>
-          </MagneticWrap>
-          <MagneticWrap>
-            <OriginButton variant="outline" onClick={() => goTo("contacto")}>
+            <OriginButton variant="solid" size="lg" onClick={() => goTo("contacto")}>
               Consultar presupuesto
             </OriginButton>
           </MagneticWrap>
+          <MagneticWrap>
+            <OriginButton variant="outline" size="lg" onClick={() => goTo("servicios")}>
+              Ver servicios
+            </OriginButton>
+          </MagneticWrap>
         </div>
+        <p className="mt-4 text-sm text-gray-300">
+          Te respondemos por WhatsApp.
+        </p>
       </AnimatedGroup>
     </AuroraBackground>
   </section>
@@ -1775,8 +2013,8 @@ const PlanCard: React.FC<{ plan: Plan }> = ({ plan }) => {
           {plan.title}
         </h3>
         <p className="mt-2 text-sm leading-relaxed text-zinc-300">{plan.tagline}</p>
-        <p className="mt-4 text-sm leading-relaxed text-zinc-400">
-          <span className="font-medium text-zinc-200">Ideal para: </span>
+        <p className="mt-4 text-sm leading-relaxed text-zinc-300">
+          <span className="font-medium text-zinc-100">Ideal para: </span>
           {plan.ideal}
         </p>
         <ul
@@ -1797,7 +2035,7 @@ const PlanCard: React.FC<{ plan: Plan }> = ({ plan }) => {
           ))}
         </ul>
         {plan.note ? (
-          <p className="mt-4 text-sm leading-relaxed text-zinc-400">{plan.note}</p>
+          <p className="mt-4 text-sm leading-relaxed text-zinc-300">{plan.note}</p>
         ) : null}
       </div>
 
@@ -1975,7 +2213,7 @@ const PlanFinder: React.FC = () => {
               <span className="block text-base font-semibold text-zinc-50">
                 Lo que necesito
               </span>
-              <span className="mt-1 block text-sm text-zinc-400">
+              <span className="mt-1 block text-sm text-zinc-300">
                 {selected.length} {selected.length === 1 ? "marcada" : "marcadas"}
               </span>
             </th>
@@ -2012,7 +2250,7 @@ const PlanFinder: React.FC = () => {
               <th
                 scope="rowgroup"
                 colSpan={FINDER_COLUMNS.length + 1}
-                className="border-y border-white/10 bg-white/[0.03] px-4 py-2 text-left text-sm font-medium text-zinc-400 md:px-5"
+                className="border-y border-white/10 bg-white/[0.03] px-4 py-2 text-left text-sm font-medium text-zinc-300 md:px-5"
               >
                 {group.label}
               </th>
@@ -2035,7 +2273,7 @@ const PlanFinder: React.FC = () => {
                           "flex size-5 shrink-0 items-center justify-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-cyan-300/70 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-black",
                           checked
                             ? "border-cyan-300 bg-cyan-300 text-neutral-950"
-                            : "border-white/30",
+                            : "border-white/50",
                         )}
                       >
                         {checked ? <Check size={14} strokeWidth={3} /> : null}
@@ -2071,13 +2309,13 @@ const PlanFinder: React.FC = () => {
                               ? "bg-cyan-300 text-neutral-950"
                               : available
                                 ? "text-cyan-300"
-                                : "text-zinc-500",
+                                : "text-zinc-400",
                           )}
                         >
                           {available ? <Check size={16} strokeWidth={2.5} /> : <X size={16} />}
                         </span>
                         {typeof value === "string" && available ? (
-                          <span className="block text-xs leading-4 text-zinc-400">
+                          <span className="block text-xs leading-4 text-zinc-300">
                             {value}
                           </span>
                         ) : null}
@@ -2111,7 +2349,7 @@ const PlanFinder: React.FC = () => {
             >
               {summary}
             </p>
-            <p className="mt-1 text-sm leading-relaxed text-zinc-400">{detail}</p>
+            <p className="mt-1 text-sm leading-relaxed text-zinc-300">{detail}</p>
           </div>
           {selected.length > 0 ? (
             <button
@@ -2133,7 +2371,7 @@ const PlanFinder: React.FC = () => {
               {bestPlans.map((plan) => (
                 <li key={plan.id}>
                   <p className="text-sm font-medium text-zinc-100">{plan.title}</p>
-                  <p className="text-sm leading-relaxed text-zinc-400">{plan.tagline}</p>
+                  <p className="text-sm leading-relaxed text-zinc-300">{plan.tagline}</p>
                 </li>
               ))}
             </ul>
@@ -2167,7 +2405,7 @@ const ServicesGrid: React.FC = () => (
   >
     <div className="relative mx-auto max-w-6xl">
       <div className="mb-12 text-center">
-        <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300/70">
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300">
           Servicios y planes
         </p>
         <h2
@@ -2215,7 +2453,7 @@ const Portfolio: React.FC = () => (
   >
     <div className="mx-auto max-w-6xl">
       <div className="mb-6 text-center">
-        <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300/70">
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300">
           Portfolio
         </p>
         <h2
@@ -2237,6 +2475,16 @@ const Portfolio: React.FC = () => (
         background="transparent"
         ink="#f4f4f5"
       />
+      <div className="mt-10 flex flex-col items-center gap-4 text-center">
+        <p className="text-base text-zinc-300">
+          ¿Querés una web así para tu negocio o tu evento?
+        </p>
+        <MagneticWrap>
+          <OriginButton variant="solid" onClick={() => goTo("contacto")}>
+            Consultar presupuesto
+          </OriginButton>
+        </MagneticWrap>
+      </div>
     </div>
   </section>
 );
@@ -2251,7 +2499,7 @@ const AboutUs: React.FC = () => (
   >
     <div className="mx-auto grid max-w-6xl gap-14 lg:grid-cols-12 lg:gap-10">
       <div className="lg:col-span-6">
-        <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300/70">
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300">
           Quiénes somos
         </p>
         <h2
@@ -2306,7 +2554,7 @@ const AboutUs: React.FC = () => (
                   <h3 className="text-xl font-semibold tracking-tight text-zinc-50 sm:text-2xl">
                     {person.name}
                   </h3>
-                  <p className="mt-0.5 text-sm text-zinc-400">
+                  <p className="mt-0.5 text-sm text-zinc-300">
                     Tecnicatura Universitaria en Programación
                   </p>
                 </div>
@@ -2420,7 +2668,7 @@ const AnimatedWaveFooter: React.FC = () => {
           <div className="grid grid-cols-2 gap-8">
             <div>
               <h3 className="mb-4 text-lg font-semibold text-zinc-50">Enlaces</h3>
-              <nav aria-label="Enlaces del sitio" className="space-y-1 text-sm text-zinc-400">
+              <nav aria-label="Enlaces del sitio" className="space-y-1 text-sm text-zinc-300">
                 <a href="#inicio" className={footerLink}>
                   Inicio
                 </a>
@@ -2446,7 +2694,7 @@ const AnimatedWaveFooter: React.FC = () => {
             </div>
             <div>
               <h3 className="mb-4 text-lg font-semibold text-zinc-50">WhatsApp</h3>
-              <address className="space-y-1 text-sm not-italic text-zinc-400">
+              <address className="space-y-1 text-sm not-italic text-zinc-300">
                 {CONTACTS.map((contact) => (
                   <a
                     key={contact.id}
@@ -2466,7 +2714,7 @@ const AnimatedWaveFooter: React.FC = () => {
         </div>
 
         <div className="mt-16 border-t border-white/10 pt-8 text-center">
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-zinc-300">
             © {year} VisoTech. Todos los derechos reservados.
           </p>
         </div>
@@ -2482,6 +2730,46 @@ const AnimatedWaveFooter: React.FC = () => {
    ============================================================ */
 
 export default function Page() {
+  const [showMist, setShowMist] = React.useState(false);
+
+  // El shader WebGL es lo más pesado de la página: se monta recién cuando el
+  // navegador está libre, para no competir con el primer render. Con "ahorro de
+  // datos" activado directamente no se carga y queda el fondo negro.
+  React.useEffect(() => {
+    const connection = (
+      navigator as Navigator & { connection?: { saveData?: boolean } }
+    ).connection;
+    if (connection?.saveData) return;
+
+    const start = () => setShowMist(true);
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(start, { timeout: 1500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(start, 800);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  // Medición de conversiones en GA4 (solo envía si Analytics está cargado):
+  // clicks a WhatsApp y a los PDF de propuestas.
+  React.useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      const wa = target?.closest<HTMLAnchorElement>('a[href^="https://wa.me/"]');
+      if (wa) {
+        track("whatsapp_click", {
+          source: "link",
+          label: (wa.textContent ?? "").trim().slice(0, 60),
+        });
+        return;
+      }
+      const pdf = target?.closest<HTMLAnchorElement>('a[href$=".pdf"]');
+      if (pdf) track("pdf_click", { file: pdf.getAttribute("href") ?? "" });
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
+
   return (
     <MotionConfig reducedMotion="user">
       <StaticCursor variant="ring" size={24} blendMode="exclusion">
@@ -2502,9 +2790,13 @@ export default function Page() {
               aria-hidden="true"
               className="pointer-events-none sticky top-0 z-0 -mb-[100svh] h-svh w-full overflow-hidden bg-black"
             >
-              <MistBackground speed={0.6} opacity={0.7} />
+              {showMist ? (
+                <div className="vt-fade-in absolute inset-0">
+                  <MistBackground speed={0.6} opacity={0.7} />
+                </div>
+              ) : null}
               {/* Velo oscuro para que el texto se lea bien sobre la niebla */}
-              <div className="absolute inset-0 bg-black/40" />
+              <div className="absolute inset-0 bg-black/50" />
             </div>
 
             <div className="relative z-10">
@@ -2513,6 +2805,7 @@ export default function Page() {
                 <ServicesGrid />
                 <Portfolio />
                 <AboutUs />
+                <ContactForm />
               </main>
               <AnimatedWaveFooter />
             </div>
