@@ -8,7 +8,14 @@ import Image from "next/image";
 import Link from "next/link";
 import * as React from "react";
 import { useState, useEffect, useRef } from "react";
-import { motion, MotionConfig, type Variants } from "framer-motion";
+import {
+  motion,
+  MotionConfig,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+  type Variants,
+} from "framer-motion";
 import {
   Home,
   LayoutGrid,
@@ -18,14 +25,22 @@ import {
   Rocket,
   Utensils,
   PartyPopper,
-  Sparkles,
   Users,
   Check,
-  X,
   Zap,
   GraduationCap,
   SlidersHorizontal,
   FileText,
+  UserRound,
+  QrCode,
+  ShoppingBag,
+  CalendarDays,
+  Images,
+  Building2,
+  Paintbrush,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 /* ============================================================
@@ -102,6 +117,14 @@ const FORM_TOPICS = [
   "una landing page para mi negocio",
   "una invitación digital para un evento",
   "una carta o catálogo digital",
+  "un portfolio o sitio profesional",
+  "una tarjeta digital con QR",
+  "una landing para un curso o capacitación",
+  "un catálogo con carrito a WhatsApp",
+  "una web de evento o lanzamiento",
+  "una galería o lookbook",
+  "fichas de propiedades para una inmobiliaria",
+  "un rediseño visual de mi web",
   "otra cosa",
 ] as const;
 
@@ -1820,40 +1843,66 @@ const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
    SECCIONES
    ============================================================ */
 
-const Hero: React.FC = () => (
-  <section id="inicio" aria-labelledby="hero-titulo">
-    <AuroraBackground starCount={24} pulseDuration={8} className="px-4 py-28">
-      <AnimatedGroup className="mx-auto flex max-w-3xl flex-col items-center text-center">
-        <h1
-          id="hero-titulo"
-          className="bg-gradient-to-br from-gray-50 to-gray-400 bg-clip-text pb-1 text-4xl font-bold tracking-tight text-balance text-transparent sm:text-5xl md:text-6xl"
-        >
-          VisoTech: webs visuales para negocios y eventos
-        </h1>
-        <p className="mx-auto mt-6 max-w-xl text-lg text-gray-300">
-          Diseñamos landing pages para negocios, cartas y catálogos digitales e
-          invitaciones para eventos. A medida, con animaciones cuidadas y
-          pensadas para el celular.
-        </p>
-        <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <MagneticWrap>
-            <OriginButton variant="solid" size="lg" onClick={() => goTo("contacto")}>
-              Consultar presupuesto
-            </OriginButton>
-          </MagneticWrap>
-          <MagneticWrap>
-            <OriginButton variant="outline" size="lg" onClick={() => goTo("servicios")}>
-              Ver servicios
-            </OriginButton>
-          </MagneticWrap>
-        </div>
-        <p className="mt-4 text-sm text-gray-300">
-          Te respondemos por WhatsApp.
-        </p>
-      </AnimatedGroup>
-    </AuroraBackground>
-  </section>
-);
+const Hero: React.FC = () => {
+  const ref = React.useRef<HTMLElement>(null);
+  const reduce = useReducedMotion();
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start start", "end start"],
+  });
+
+  // Cada bloque baja a distinta velocidad al hacer scroll (efecto parallax).
+  // Si la persona tiene "reducir movimiento" activado, no se mueve nada.
+  const k = reduce ? 0 : 1;
+  const yTitle = useTransform(scrollYProgress, [0, 1], [0, 220 * k]);
+  const yText = useTransform(scrollYProgress, [0, 1], [0, 140 * k]);
+  const yButtons = useTransform(scrollYProgress, [0, 1], [0, 70 * k]);
+  const fade = useTransform(scrollYProgress, [0, 0.7], [1, reduce ? 1 : 0]);
+
+  return (
+    <section ref={ref} id="inicio" aria-labelledby="hero-titulo">
+      <AuroraBackground starCount={24} pulseDuration={8} className="px-4 py-28">
+        <motion.div style={{ opacity: fade }} className="w-full">
+          <AnimatedGroup className="mx-auto flex max-w-3xl flex-col items-center text-center">
+            <motion.div style={{ y: yTitle }}>
+              <h1
+                id="hero-titulo"
+                className="bg-gradient-to-br from-gray-50 to-gray-400 bg-clip-text pb-1 text-4xl font-bold tracking-tight text-balance text-transparent sm:text-5xl md:text-6xl"
+              >
+                VisoTech: webs visuales para negocios y eventos
+              </h1>
+            </motion.div>
+
+            <motion.p
+              style={{ y: yText }}
+              className="mx-auto mt-6 max-w-xl text-lg text-gray-300"
+            >
+              Diseñamos landing pages para negocios, cartas y catálogos digitales e
+              invitaciones para eventos. A medida, con animaciones cuidadas y
+              pensadas para el celular.
+            </motion.p>
+
+            <motion.div style={{ y: yButtons }} className="flex flex-col items-center">
+              <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <MagneticWrap>
+                  <OriginButton variant="solid" size="lg" onClick={() => goTo("contacto")}>
+                    Consultar presupuesto
+                  </OriginButton>
+                </MagneticWrap>
+                <MagneticWrap>
+                  <OriginButton variant="outline" size="lg" onClick={() => goTo("servicios")}>
+                    Ver servicios
+                  </OriginButton>
+                </MagneticWrap>
+              </div>
+              <p className="mt-4 text-sm text-gray-300">Te respondemos por WhatsApp.</p>
+            </motion.div>
+          </AnimatedGroup>
+        </motion.div>
+      </AuroraBackground>
+    </section>
+  );
+};
 
 /* ---------- Servicios y planes ---------- */
 
@@ -1869,8 +1918,10 @@ type Plan = {
   topic: string;
   featured?: boolean;
   span: string;
-  /** Ruta del PDF de la propuesta (archivo dentro de public/propuestas/) */
-  pdf: string;
+  /** PDF de la propuesta (public/propuestas/). Si falta, no se muestra el botón. */
+  pdf?: string;
+  /** Necesidades que cubre (ids de FINDER_NEEDS) */
+  needs: string[];
 };
 
 const PLANS: Plan[] = [
@@ -1892,6 +1943,7 @@ const PLANS: Plan[] = [
     featured: true,
     span: "md:col-span-4",
     pdf: "/propuestas/01-Landing-page-para-negocios.pdf",
+    needs: ["negocio"],
   },
   {
     id: "invitacion",
@@ -1907,6 +1959,7 @@ const PLANS: Plan[] = [
     topic: "una invitación digital para un evento",
     span: "md:col-span-2",
     pdf: "/propuestas/02-Invitacion-digital-para-eventos.pdf",
+    needs: ["evento", "confirmar"],
   },
   {
     id: "carta",
@@ -1914,8 +1967,7 @@ const PLANS: Plan[] = [
     title: "Carta o catálogo digital",
     tagline:
       "Tus productos o tu menú en una página visual, fácil de abrir desde el celular.",
-    ideal:
-      "Restaurantes, bares, cafeterías, comercios y emprendimientos que quieren mostrar sus productos o servicios.",
+    ideal: "Restaurantes, bares, cafeterías y comercios que quieren mostrar sus productos.",
     includes: [
       "Fotografías de tus productos o platos",
       "Categorías y precios",
@@ -1923,31 +1975,142 @@ const PLANS: Plan[] = [
     ],
     note: "Es una carta para ver y consultar: no incluye pagos ni pedidos online.",
     topic: "una carta o catálogo digital",
-    span: "md:col-span-3",
+    span: "md:col-span-2",
     pdf: "/propuestas/03-Carta-o-catalogo-digital.pdf",
+    needs: ["productos"],
   },
   {
-    id: "personalizada",
-    icon: <Sparkles size={20} />,
-    title: "Proyecto personalizado",
-    tagline:
-      "Un sitio moderno armado a medida de tu identidad y tus necesidades.",
-    ideal:
-      "Quienes necesitan una página con una idea o una presentación diferente.",
+    id: "perfil",
+    icon: <UserRound size={20} />,
+    title: "Portfolio o sitio profesional",
+    tagline: "Tu trayectoria y tus trabajos en una página clara, con tu identidad.",
+    ideal: "Profesionales, creativos, freelancers, docentes y especialistas.",
     includes: [
-      "Diseño y animaciones a medida",
-      "Las secciones que tu proyecto necesite",
+      "Presentación, servicios y trabajos destacados",
+      "Diseño propio y animaciones cuidadas",
       "Adaptado a celular y computadora",
     ],
-    note: "Nos enfocamos en diseño y frontend: sin login, paneles de administración ni pagos.",
-    topic: "un proyecto web personalizado",
-    span: "md:col-span-3",
-    pdf: "/propuestas/04-Proyecto-personalizado.pdf",
+    topic: "un portfolio o sitio profesional",
+    span: "md:col-span-2",
+    needs: ["negocio", "trabajos"],
+  },
+  {
+    id: "tarjeta",
+    icon: <QrCode size={20} />,
+    title: "Tarjeta digital con QR",
+    tagline: "Tus enlaces y tu contacto en una sola página, listos para compartir.",
+    ideal: "Emprendedores y profesionales que comparten su info por redes o impresos.",
+    includes: [
+      "Botones a WhatsApp, redes y ubicación",
+      "Código QR listo para imprimir",
+      "Diseño con tu identidad",
+    ],
+    topic: "una tarjeta digital con QR",
+    span: "md:col-span-2",
+    needs: ["qr"],
+  },
+  {
+    id: "curso",
+    icon: <GraduationCap size={20} />,
+    title: "Landing para cursos y capacitaciones",
+    tagline: "Una página que explica tu curso y lleva a inscribirse por WhatsApp.",
+    ideal: "Academias, institutos, instructores y talleres.",
+    includes: [
+      "Programa, fechas, modalidad y contenidos",
+      "Preguntas frecuentes",
+      "Botón de inscripción por WhatsApp",
+    ],
+    note: "Las inscripciones y los pagos se coordinan por WhatsApp: el sitio no los procesa.",
+    topic: "una landing para un curso o capacitación",
+    span: "md:col-span-2",
+    needs: ["curso", "negocio"],
+  },
+  {
+    id: "carrito",
+    icon: <ShoppingBag size={20} />,
+    title: "Catálogo con carrito a WhatsApp",
+    tagline: "Tus clientes eligen productos y el pedido llega armado a tu WhatsApp.",
+    ideal: "Tiendas, rotiserías, emprendimientos y comercios de barrio.",
+    includes: [
+      "Productos con fotos, categorías y precios",
+      "Carrito que arma el mensaje del pedido",
+      "Pensado para usar desde el celular",
+    ],
+    note: "El pedido se confirma por WhatsApp: no incluye pagos online ni control de stock.",
+    topic: "un catálogo con carrito a WhatsApp",
+    span: "md:col-span-2",
+    needs: ["productos", "pedidos"],
+  },
+  {
+    id: "evento",
+    icon: <CalendarDays size={20} />,
+    title: "Web de evento o lanzamiento",
+    tagline: "Fecha, lugar y programa de tu evento, con cuenta regresiva.",
+    ideal: "Charlas, fiestas, ferias, inauguraciones y lanzamientos.",
+    includes: [
+      "Cuenta regresiva y cronograma",
+      "Ubicación con enlace a Google Maps",
+      "Confirmación de asistencia por WhatsApp",
+    ],
+    topic: "una web de evento o lanzamiento",
+    span: "md:col-span-2",
+    needs: ["evento", "cuenta", "confirmar"],
+  },
+  {
+    id: "galeria",
+    icon: <Images size={20} />,
+    title: "Galería o lookbook",
+    tagline: "Tus fotos y trabajos en una galería cuidada y fácil de recorrer.",
+    ideal: "Fotógrafos, estudios, tatuadores, diseñadores y marcas.",
+    includes: [
+      "Galería con vista ampliada",
+      "Categorías o colecciones",
+      "Contacto por WhatsApp",
+    ],
+    topic: "una galería o lookbook",
+    span: "md:col-span-2",
+    needs: ["trabajos"],
+  },
+  {
+    id: "inmobiliaria",
+    icon: <Building2 size={20} />,
+    title: "Fichas de propiedades",
+    tagline: "Cada propiedad con su ficha, sus fotos y sus datos clave.",
+    ideal: "Inmobiliarias, corredores y alquileres temporarios.",
+    includes: [
+      "Fichas con fotos, medidas y características",
+      "Filtros por tipo y zona",
+      "Consulta directa por WhatsApp",
+    ],
+    note: "El contenido es estático: las propiedades se actualizan con nosotros, sin panel de administración.",
+    topic: "fichas de propiedades para una inmobiliaria",
+    span: "md:col-span-2",
+    needs: ["propiedades"],
+  },
+  {
+    id: "rediseno",
+    icon: <Paintbrush size={20} />,
+    title: "Rediseño visual de tu web",
+    tagline: "Renovamos el diseño de la web que ya tenés para que se vea moderna.",
+    ideal: "Negocios con un sitio desactualizado o poco visual.",
+    includes: [
+      "Nuevo diseño y animaciones",
+      "Mejor lectura en celular",
+      "El mismo contenido, mejor presentado",
+    ],
+    note: "Trabajamos solo la parte visual: no incluye cambios de sistema ni de servidor.",
+    topic: "un rediseño visual de mi web",
+    span: "md:col-span-2",
+    needs: ["rediseno"],
   },
 ];
 
 const planCard =
   "relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/40 p-7 backdrop-blur-xl transition-colors duration-300 hover:border-white/20";
+
+/** Tarjeta dentro del carrusel 3D: sin backdrop-blur (no se lleva bien con transformaciones 3D) y con fondo sólido. */
+const slideCard =
+  "relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-neutral-950/95 p-7 shadow-2xl transition-colors duration-300 hover:border-white/20";
 
 const iconBox =
   "flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white";
@@ -1972,14 +2135,18 @@ const WaPill: React.FC<{
   </a>
 );
 
-const PlanCard: React.FC<{ plan: Plan }> = ({ plan }) => {
+const PlanCard: React.FC<{ plan: Plan; variant?: "grid" | "slide" }> = ({
+  plan,
+  variant = "grid",
+}) => {
   const titleId = `plan-${plan.id}`;
+  const panelId = `plan-${plan.id}-contacto`;
+  const [open, setOpen] = React.useState(false);
   return (
     <article
       aria-labelledby={titleId}
       className={cn(
-        planCard,
-        plan.span,
+        variant === "slide" ? slideCard : cn(planCard, plan.span),
         plan.featured &&
           "border-cyan-300/30 shadow-[0_0_60px_-15px_rgba(34,211,238,0.45)] hover:border-cyan-300/50",
       )}
@@ -2020,7 +2187,7 @@ const PlanCard: React.FC<{ plan: Plan }> = ({ plan }) => {
         <ul
           className={cn(
             "mt-5 grid gap-2.5 text-sm text-zinc-300",
-            plan.featured && "sm:grid-cols-2",
+            plan.featured && variant === "grid" && "sm:grid-cols-2",
           )}
         >
           {plan.includes.map((item) => (
@@ -2040,38 +2207,373 @@ const PlanCard: React.FC<{ plan: Plan }> = ({ plan }) => {
       </div>
 
       <div className="relative mt-auto border-t border-white/10 pt-5">
-        <a
-          href={plan.pdf}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Ver la propuesta de ${plan.title} en PDF (se abre en una pestaña nueva)`}
+        {plan.pdf ? (
+          <a
+            href={plan.pdf}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Ver la propuesta de ${plan.title} en PDF (se abre en una pestaña nueva)`}
+            className={cn(
+              "mb-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-neutral-950 transition-colors hover:bg-zinc-200",
+              focusRing,
+            )}
+          >
+            <FileText size={16} aria-hidden="true" />
+            Ver propuesta
+          </a>
+        ) : null}
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={() => setOpen((value) => !value)}
           className={cn(
-            "mb-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-neutral-950 transition-colors hover:bg-zinc-200",
+            "inline-flex h-11 w-full items-center justify-between gap-2 rounded-xl border border-white/20 bg-white/5 px-4 text-sm font-medium text-white transition-colors hover:bg-white/10",
             focusRing,
           )}
         >
-          <FileText size={16} aria-hidden="true" />
-          Ver propuesta
-        </a>
-        <p className="text-sm font-medium text-zinc-100">Consultar presupuesto</p>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          {CONTACTS.map((contact) => (
-            <WaPill
-              key={contact.id}
-              contact={contact}
-              topic={plan.topic}
-              ariaLabel={`Escribir a ${contact.name} por WhatsApp para consultar el presupuesto de ${plan.title}`}
-            />
-          ))}
-        </div>
+          Consultar presupuesto
+          <ChevronDown
+            size={16}
+            aria-hidden="true"
+            className={cn("transition-transform duration-300", open && "rotate-180")}
+          />
+        </button>
+        {open ? (
+          <div
+            id={panelId}
+            className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap"
+          >
+            {CONTACTS.map((contact) => (
+              <WaPill
+                key={contact.id}
+                contact={contact}
+                topic={plan.topic}
+                ariaLabel={`Escribir a ${contact.name} por WhatsApp para consultar el presupuesto de ${plan.title}`}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
     </article>
   );
 };
 
-/* ---------- Buscador de proyecto ---------- */
+/* ---------- Carrusel 3D (coverflow) de planes ---------- */
 
-type FinderColumn = { id: string; name: string };
+const COVERFLOW = {
+  /** Grados que se inclina la primera tarjeta vecina */
+  rotate: 40,
+  /** Cuánto retrocede la primera vecina, como fracción del ancho de la tarjeta */
+  depth: 0.5,
+  /** Exponente de la distancia: menor a 1 suaviza la inclinación de las tarjetas lejanas */
+  falloff: 0.56,
+  /** Opacidad que pierde cada tarjeta por paso desde el centro */
+  fade: 0.2,
+  /** Espacio entre tarjetas, como fracción del ancho de la tarjeta */
+  gap: 0.06,
+} as const;
+
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
+
+const PlansCoverflow: React.FC = () => {
+  const count = PLANS.length;
+  const reduce = useReducedMotion();
+
+  const frameRef = React.useRef<HTMLDivElement>(null);
+  const cardRefs = React.useRef<(HTMLDivElement | null)[]>([]);
+  /** Índice fraccionario de la tarjeta que está al centro. Es la única fuente de verdad. */
+  const posRef = React.useRef(0);
+  /** Hacia dónde va la animación actual. */
+  const targetRef = React.useRef(0);
+  const widthRef = React.useRef(0);
+  const rafRef = React.useRef<number | null>(null);
+  const reduceRef = React.useRef(false);
+  const movedRef = React.useRef(false);
+  const dragRef = React.useRef<{
+    id: number;
+    x: number;
+    pos: number;
+    v: number;
+    t: number;
+    active: boolean;
+  } | null>(null);
+
+  const [selected, setSelected] = React.useState(0);
+
+  reduceRef.current = Boolean(reduce);
+
+  /** Tarjeta entera más cercana, llevada de vuelta al rango 0..count-1. */
+  const indexAt = React.useCallback(
+    (pos: number) => ((Math.round(pos) % count) + count) % count,
+    [count],
+  );
+
+  // Se pinta directo en el DOM: 60 actualizaciones de estado por segundo
+  // volverían a renderizar todas las tarjetas para números que React no necesita.
+  const paint = React.useCallback(() => {
+    const width = widthRef.current;
+    if (!width) return;
+    const pitch = width * (1 + COVERFLOW.gap);
+    const pos = posRef.current;
+
+    cardRefs.current.forEach((card, index) => {
+      if (!card) return;
+
+      // Se toma el camino más corto alrededor del anillo: así el carrusel
+      // es infinito sin clonar nodos.
+      let offset = index - pos;
+      offset = ((offset % count) + count) % count;
+      if (offset > count / 2) offset -= count;
+
+      const distance = Math.abs(offset);
+      const ramp = Math.pow(distance, COVERFLOW.falloff);
+      // Tope antes de quedar de canto: una tarjeta lejana nunca da la espalda.
+      const tilt = Math.min(COVERFLOW.rotate * ramp, 82) * Math.sign(offset);
+
+      card.style.transform =
+        `translateX(${offset * pitch}px) ` +
+        `translateZ(${-COVERFLOW.depth * width * ramp}px) rotateY(${-tilt}deg)`;
+
+      // La tarjeta "salta" al otro lado del anillo justo a media vuelta,
+      // así que tiene que estar invisible para entonces.
+      const edge = Math.min(1, Math.max(0, count / 2 - distance));
+      card.style.opacity = String(Math.max(0, 1 - COVERFLOW.fade * distance) * edge);
+      card.style.zIndex = String(100 - Math.round(distance));
+      // Solo la tarjeta del centro recibe clics; el arrastre lo maneja el marco.
+      card.style.pointerEvents = distance < 0.5 ? "auto" : "none";
+    });
+  }, [count]);
+
+  const settle = React.useCallback(
+    (target: number) => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      targetRef.current = target;
+      setSelected(indexAt(target));
+
+      if (reduceRef.current) {
+        posRef.current = target;
+        paint();
+        rafRef.current = null;
+        return;
+      }
+
+      const step = () => {
+        const remaining = target - posRef.current;
+        if (Math.abs(remaining) < 0.0004) {
+          posRef.current = target;
+          paint();
+          rafRef.current = null;
+          return;
+        }
+        posRef.current += remaining * 0.16;
+        paint();
+        rafRef.current = requestAnimationFrame(step);
+      };
+      rafRef.current = requestAnimationFrame(step);
+    },
+    [indexAt, paint],
+  );
+
+  const nudge = React.useCallback(
+    (by: number) => settle(Math.round(targetRef.current) + by),
+    [settle],
+  );
+
+  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    movedRef.current = false;
+    // Todavía no se captura el puntero: si fuera un simple clic en un botón
+    // de la tarjeta, tiene que llegarle normalmente.
+    dragRef.current = {
+      id: event.pointerId,
+      x: event.clientX,
+      pos: posRef.current,
+      v: 0,
+      t: performance.now(),
+      active: false,
+    };
+  };
+
+  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId) return;
+
+    if (!drag.active) {
+      if (Math.abs(event.clientX - drag.x) < 8) return;
+      drag.active = true;
+      movedRef.current = true;
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      targetRef.current = posRef.current;
+      drag.x = event.clientX;
+      drag.pos = posRef.current;
+      drag.t = performance.now();
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
+    const pitch = widthRef.current * (1 + COVERFLOW.gap);
+    if (!pitch) return;
+
+    const now = performance.now();
+    const previous = posRef.current;
+    posRef.current = drag.pos - (event.clientX - drag.x) / pitch;
+    // Tarjetas por segundo, para el envión al soltar.
+    drag.v = ((posRef.current - previous) / Math.max(now - drag.t, 1)) * 1000;
+    drag.t = now;
+
+    const index = indexAt(posRef.current);
+    if (index !== selected) setSelected(index);
+    paint();
+  };
+
+  const endDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    dragRef.current = null;
+    if (!drag.active) return;
+    // Un envión puede arrastrar la tarjeta, pero nunca más de dos lugares.
+    const carried = Math.max(-2, Math.min(2, drag.v * 0.18));
+    settle(Math.round(posRef.current + carried));
+  };
+
+  // Si hubo arrastre, el clic que sigue al soltar no tiene que activar nada.
+  const onClickCapture = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (movedRef.current) {
+      event.stopPropagation();
+      event.preventDefault();
+      movedRef.current = false;
+    }
+  };
+
+  // El ancho de la tarjeta define la separación y la profundidad: es lo único que se mide.
+  useIsoLayoutEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+
+    const measure = () => {
+      const card = cardRefs.current[0];
+      if (!card) return;
+      widthRef.current = card.offsetWidth;
+      paint();
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [paint]);
+
+  // Las tarjetas que no están al centro no deben recibir foco con el teclado.
+  React.useEffect(() => {
+    cardRefs.current.forEach((card, index) => {
+      if (card) (card as unknown as { inert: boolean }).inert = index !== selected;
+    });
+  }, [selected]);
+
+  React.useEffect(
+    () => () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    },
+    [],
+  );
+
+  return (
+    <div
+      role="region"
+      aria-roledescription="carousel"
+      aria-label="Proyectos y planes"
+      style={{ ["--cf-card" as string]: "clamp(280px, 78vw, 380px)" }}
+    >
+      <div
+        ref={frameRef}
+        role="group"
+        aria-label="Tarjetas de proyectos. Usá las flechas izquierda y derecha para cambiar."
+        tabIndex={0}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onClickCapture={onClickCapture}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            nudge(-1);
+          } else if (event.key === "ArrowRight") {
+            event.preventDefault();
+            nudge(1);
+          }
+        }}
+        className="cursor-grab select-none overflow-hidden rounded-2xl py-6 outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 active:cursor-grabbing"
+        style={{
+          perspective: "calc(var(--cf-card) * 3)",
+          // El arrastre horizontal lo manejamos nosotros; la página mantiene el scroll vertical.
+          touchAction: "pan-y",
+        }}
+      >
+        {/* Todas las tarjetas comparten la misma celda: la más alta define el alto de todas */}
+        <div className="grid" style={{ transformStyle: "preserve-3d" }}>
+          {PLANS.map((plan, index) => (
+            <div
+              key={plan.id}
+              ref={(node) => {
+                cardRefs.current[index] = node;
+              }}
+              role="group"
+              aria-roledescription="slide"
+              aria-label={`${index + 1} de ${count}`}
+              aria-hidden={index === selected ? undefined : true}
+              className="col-start-1 row-start-1 justify-self-center will-change-transform"
+              style={{ width: "var(--cf-card)", opacity: index === 0 ? 1 : 0 }}
+            >
+              <PlanCard plan={plan} variant="slide" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mx-auto mt-4 flex max-w-xs items-center justify-between gap-4">
+        <button
+          type="button"
+          aria-label="Proyecto anterior"
+          onClick={() => nudge(-1)}
+          className={cn(
+            "flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white transition-colors hover:bg-white hover:text-neutral-950",
+            focusRing,
+          )}
+        >
+          <ChevronLeft size={20} aria-hidden="true" />
+        </button>
+        <span
+          aria-hidden="true"
+          className="font-mono text-xs tracking-[0.14em] text-zinc-300"
+        >
+          <b className="font-medium text-zinc-50">{pad2(selected + 1)}</b> / {pad2(count)}
+        </span>
+        <button
+          type="button"
+          aria-label="Proyecto siguiente"
+          onClick={() => nudge(1)}
+          className={cn(
+            "flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white transition-colors hover:bg-white hover:text-neutral-950",
+            focusRing,
+          )}
+        >
+          <ChevronRight size={20} aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="sr-only" aria-live="polite">
+        {`Proyecto ${selected + 1} de ${count}: ${PLANS[selected].title}`}
+      </div>
+    </div>
+  );
+};
+
+/* ---------- Buscador de proyecto ---------- */
 
 type FinderNeed = {
   id: string;
@@ -2079,71 +2581,21 @@ type FinderNeed = {
   /** Versión corta para el mensaje de WhatsApp */
   short: string;
   group: string;
-  /** true o un texto = incluido; false = no incluido */
-  availability: Record<string, boolean | string>;
 };
-
-const FINDER_COLUMNS: FinderColumn[] = [
-  { id: "landing", name: "Landing page" },
-  { id: "carta", name: "Carta o catálogo" },
-  { id: "invitacion", name: "Invitación digital" },
-  { id: "personalizada", name: "Proyecto personalizado" },
-];
 
 const FINDER_NEEDS: FinderNeed[] = [
-  {
-    id: "presentar",
-    label: "Presentar mi negocio o proyecto",
-    short: "presentar mi negocio o proyecto",
-    group: "Qué quiero mostrar",
-    availability: { landing: true, carta: false, invitacion: false, personalizada: true },
-  },
-  {
-    id: "productos",
-    label: "Mostrar productos o servicios con fotos y precios",
-    short: "mostrar productos o servicios con fotos y precios",
-    group: "Qué quiero mostrar",
-    availability: { landing: false, carta: true, invitacion: false, personalizada: true },
-  },
-  {
-    id: "evento",
-    label: "Contar los datos de un evento (fecha, lugar y horario)",
-    short: "datos de un evento",
-    group: "Qué quiero mostrar",
-    availability: { landing: false, carta: false, invitacion: true, personalizada: true },
-  },
-  {
-    id: "whatsapp",
-    label: "Que me contacten por WhatsApp",
-    short: "contacto por WhatsApp",
-    group: "Cómo quiero que se vea y funcione",
-    availability: {
-      landing: "Consultas",
-      carta: "Consultas",
-      invitacion: "Confirmar asistencia",
-      personalizada: true,
-    },
-  },
-  {
-    id: "animaciones",
-    label: "Animaciones y diseño a medida",
-    short: "animaciones y diseño a medida",
-    group: "Cómo quiero que se vea y funcione",
-    availability: { landing: true, carta: true, invitacion: true, personalizada: true },
-  },
-  {
-    id: "secciones",
-    label: "Secciones y estructura a medida",
-    short: "secciones y estructura a medida",
-    group: "Cómo quiero que se vea y funcione",
-    availability: { landing: false, carta: false, invitacion: false, personalizada: true },
-  },
+  { id: "negocio", label: "Presentar mi negocio o servicios", short: "presentar mi negocio", group: "Qué quiero mostrar" },
+  { id: "trabajos", label: "Mostrar mis trabajos o fotos", short: "mostrar mis trabajos", group: "Qué quiero mostrar" },
+  { id: "productos", label: "Mostrar productos con fotos y precios", short: "productos con fotos y precios", group: "Qué quiero mostrar" },
+  { id: "propiedades", label: "Mostrar propiedades con fichas detalladas", short: "fichas de propiedades", group: "Qué quiero mostrar" },
+  { id: "curso", label: "Difundir un curso o capacitación", short: "un curso o capacitación", group: "Qué quiero mostrar" },
+  { id: "evento", label: "Contar los datos de un evento (fecha, lugar y horario)", short: "datos de un evento", group: "Qué quiero mostrar" },
+  { id: "pedidos", label: "Recibir pedidos armados por WhatsApp", short: "pedidos por WhatsApp", group: "Qué quiero lograr" },
+  { id: "confirmar", label: "Que mis invitados confirmen asistencia", short: "confirmación de asistencia", group: "Qué quiero lograr" },
+  { id: "cuenta", label: "Cuenta regresiva y cronograma", short: "cuenta regresiva y cronograma", group: "Qué quiero lograr" },
+  { id: "qr", label: "Compartir mis datos con un código QR", short: "código QR", group: "Qué quiero lograr" },
+  { id: "rediseno", label: "Renovar el diseño de una web que ya tengo", short: "rediseño de mi web", group: "Qué quiero lograr" },
 ];
-
-const hasNeed = (need: FinderNeed | undefined, columnId: string) => {
-  const value = need?.availability[columnId];
-  return value === true || (typeof value === "string" && value.trim().length > 0);
-};
 
 const PlanFinder: React.FC = () => {
   const [selected, setSelected] = React.useState<string[]>([]);
@@ -2154,22 +2606,34 @@ const PlanFinder: React.FC = () => {
     );
 
   const selectedNeeds = FINDER_NEEDS.filter((need) => selected.includes(need.id));
-  const matching = FINDER_COLUMNS.filter((col) =>
-    selectedNeeds.every((need) => hasNeed(need, col.id)),
-  );
-  // Entre los que cubren todo lo marcado, gana el más específico (el que incluye menos cosas).
-  const featureCount = (colId: string) =>
-    FINDER_NEEDS.filter((need) => hasNeed(need, colId)).length;
-  const minCount = matching.length
-    ? Math.min(...matching.map((col) => featureCount(col.id)))
-    : 0;
-  const best = selectedNeeds.length
-    ? matching.filter((col) => featureCount(col.id) === minCount)
+
+  // Proyectos que cubren todo lo marcado; primero los más específicos (los que incluyen menos cosas).
+  const results = selectedNeeds.length
+    ? PLANS.filter((plan) =>
+        selectedNeeds.every((need) => plan.needs.includes(need.id)),
+      )
+        .sort((a, b) => a.needs.length - b.needs.length)
+        .slice(0, 3)
     : [];
-  const bestIds = best.map((col) => col.id);
-  const bestPlans = bestIds
-    .map((id) => PLANS.find((plan) => plan.id === id))
-    .filter((plan): plan is Plan => Boolean(plan));
+
+  const noMatch = selectedNeeds.length > 0 && results.length === 0;
+  const needsText = selectedNeeds.map((need) => need.short).join(", ");
+
+  const summary = !selectedNeeds.length
+    ? "Marcá lo que necesitás"
+    : noMatch
+      ? "Lo armamos combinando proyectos"
+      : `Te conviene: ${results.map((plan) => plan.title).join(" o ")}`;
+  const detail = !selectedNeeds.length
+    ? "Te mostramos qué tipo de proyecto encaja. Podés marcar varias opciones."
+    : noMatch
+      ? "Ningún proyecto reúne todo lo que marcaste. Contanos tu idea por WhatsApp y vemos cómo combinarlo."
+      : "Cubre todo lo que marcaste.";
+  const topic = results.length
+    ? `${results.map((plan) => plan.topic).join(" o ")} (necesito: ${needsText})`
+    : noMatch
+      ? `una web que combine: ${needsText}`
+      : undefined;
 
   const groups: { label: string; items: FinderNeed[] }[] = [];
   FINDER_NEEDS.forEach((need) => {
@@ -2178,159 +2642,52 @@ const PlanFinder: React.FC = () => {
     else groups.push({ label: need.group, items: [need] });
   });
 
-  const onlyCustom = best.length === 1 && best[0].id === "personalizada";
-  const summary =
-    best.length === 0
-      ? "Marcá lo que necesitás"
-      : `Te conviene: ${best.map((col) => col.name).join(" o ")}`;
-  const detail =
-    best.length === 0
-      ? "Te mostramos qué tipo de proyecto encaja. Podés marcar varias opciones."
-      : onlyCustom
-        ? "Ningún otro tipo de proyecto reúne todo lo que marcaste: lo armamos a medida."
-        : "Cubre todo lo que marcaste.";
-  const topic = bestPlans.length
-    ? `${bestPlans.map((plan) => plan.topic).join(" o ")} (necesito: ${selectedNeeds
-        .map((need) => need.short)
-        .join(", ")})`
-    : undefined;
-
   return (
     <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/40 backdrop-blur-xl">
-      <table className="w-full table-fixed border-collapse">
-        <caption className="sr-only">
-          Marcá lo que necesitás para saber qué tipo de proyecto te conviene
-        </caption>
-        <colgroup>
-          <col className="w-full md:w-[34%]" />
-          {FINDER_COLUMNS.map((col) => (
-            <col key={col.id} className="hidden md:table-column" />
-          ))}
-        </colgroup>
-        <thead>
-          <tr>
-            <th scope="col" className="px-4 pb-3 pt-5 text-left align-bottom font-normal md:px-5">
-              <span className="block text-base font-semibold text-zinc-50">
-                Lo que necesito
-              </span>
-              <span className="mt-1 block text-sm text-zinc-300">
-                {selected.length} {selected.length === 1 ? "marcada" : "marcadas"}
-              </span>
-            </th>
-            {FINDER_COLUMNS.map((col) => {
-              const isBest = bestIds.includes(col.id);
-              return (
-                <th
-                  key={col.id}
-                  scope="col"
-                  className={cn(
-                    "hidden px-2 pb-3 pt-4 text-center align-bottom font-normal transition-colors md:table-cell",
-                    isBest && "bg-cyan-300/[0.06]",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "mb-2 inline-block rounded-full border border-cyan-300/30 bg-cyan-300/10 px-2.5 py-0.5 text-xs font-medium text-cyan-200",
-                      isBest ? "visible" : "invisible",
-                    )}
-                  >
-                    Te conviene
-                  </span>
-                  <span className="block text-sm font-semibold text-balance text-zinc-50">
-                    {col.name}
-                  </span>
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
+      <div className="grid gap-8 p-5 md:grid-cols-2 md:p-6">
         {groups.map((group) => (
-          <tbody key={group.label}>
-            <tr>
-              <th
-                scope="rowgroup"
-                colSpan={FINDER_COLUMNS.length + 1}
-                className="border-y border-white/10 bg-white/[0.03] px-4 py-2 text-left text-sm font-medium text-zinc-300 md:px-5"
-              >
-                {group.label}
-              </th>
-            </tr>
+          <fieldset key={group.label} className="min-w-0">
+            <legend className="mb-2 text-base font-semibold text-zinc-50">
+              {group.label}
+            </legend>
             {group.items.map((need) => {
               const checked = selected.includes(need.id);
               return (
-                <tr key={need.id} className="border-b border-white/5 last:border-b-0">
-                  <th scope="row" className="px-4 text-left font-normal md:px-5">
-                    <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md py-2.5">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggle(need.id)}
-                        className="peer sr-only"
-                      />
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          "flex size-5 shrink-0 items-center justify-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-cyan-300/70 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-black",
-                          checked
-                            ? "border-cyan-300 bg-cyan-300 text-neutral-950"
-                            : "border-white/50",
-                        )}
-                      >
-                        {checked ? <Check size={14} strokeWidth={3} /> : null}
-                      </span>
-                      <span
-                        className={cn(
-                          "text-sm leading-snug md:text-[15px]",
-                          checked ? "font-medium text-zinc-50" : "text-zinc-300",
-                        )}
-                      >
-                        {need.label}
-                      </span>
-                    </label>
-                  </th>
-                  {FINDER_COLUMNS.map((col) => {
-                    const available = hasNeed(need, col.id);
-                    const value = need.availability[col.id];
-                    const missing = checked && !available;
-                    return (
-                      <td
-                        key={col.id}
-                        className={cn(
-                          "hidden px-2 text-center transition-colors md:table-cell",
-                          bestIds.includes(col.id) && "bg-cyan-300/[0.06]",
-                          missing && "opacity-40",
-                        )}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            "inline-flex size-6 items-center justify-center rounded-full",
-                            checked && available
-                              ? "bg-cyan-300 text-neutral-950"
-                              : available
-                                ? "text-cyan-300"
-                                : "text-zinc-400",
-                          )}
-                        >
-                          {available ? <Check size={16} strokeWidth={2.5} /> : <X size={16} />}
-                        </span>
-                        {typeof value === "string" && available ? (
-                          <span className="block text-xs leading-4 text-zinc-300">
-                            {value}
-                          </span>
-                        ) : null}
-                        <span className="sr-only">
-                          {available ? "Incluido" : "No incluido"}
-                        </span>
-                      </td>
-                    );
-                  })}
-                </tr>
+                <label
+                  key={need.id}
+                  className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md py-2"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggle(need.id)}
+                    className="peer sr-only"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "flex size-5 shrink-0 items-center justify-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-cyan-300/70 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-black",
+                      checked
+                        ? "border-cyan-300 bg-cyan-300 text-neutral-950"
+                        : "border-white/50",
+                    )}
+                  >
+                    {checked ? <Check size={14} strokeWidth={3} /> : null}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-sm leading-snug md:text-[15px]",
+                      checked ? "font-medium text-zinc-50" : "text-zinc-300",
+                    )}
+                  >
+                    {need.label}
+                  </span>
+                </label>
               );
             })}
-          </tbody>
+          </fieldset>
         ))}
-      </table>
+      </div>
 
       <div className="border-t border-white/10 p-5 md:p-6">
         <div className="flex items-start gap-3">
@@ -2365,16 +2722,18 @@ const PlanFinder: React.FC = () => {
           ) : null}
         </div>
 
-        {bestPlans.length > 0 ? (
+        {selectedNeeds.length > 0 ? (
           <>
-            <ul className="mt-5 space-y-3">
-              {bestPlans.map((plan) => (
-                <li key={plan.id}>
-                  <p className="text-sm font-medium text-zinc-100">{plan.title}</p>
-                  <p className="text-sm leading-relaxed text-zinc-300">{plan.tagline}</p>
-                </li>
-              ))}
-            </ul>
+            {results.length > 0 ? (
+              <ul className="mt-5 space-y-3">
+                {results.map((plan) => (
+                  <li key={plan.id}>
+                    <p className="text-sm font-medium text-zinc-100">{plan.title}</p>
+                    <p className="text-sm leading-relaxed text-zinc-300">{plan.tagline}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <p className="mt-5 text-sm font-medium text-zinc-100">
               Consultar presupuesto
             </p>
@@ -2384,9 +2743,11 @@ const PlanFinder: React.FC = () => {
                   key={contact.id}
                   contact={contact}
                   topic={topic}
-                  ariaLabel={`Escribir a ${contact.name} por WhatsApp para consultar el presupuesto de ${best
-                    .map((col) => col.name)
-                    .join(" o ")}`}
+                  ariaLabel={`Escribir a ${contact.name} por WhatsApp para consultar el presupuesto de ${
+                    results.length
+                      ? results.map((plan) => plan.title).join(" o ")
+                      : "un proyecto combinado"
+                  }`}
                 />
               ))}
             </div>
@@ -2418,13 +2779,12 @@ const ServicesGrid: React.FC = () => (
           El precio depende de cada proyecto. Escribinos por WhatsApp y te
           armamos un presupuesto.
         </p>
+        <p className="mx-auto mt-3 max-w-xl text-sm text-zinc-400">
+          Deslizá las tarjetas o usá las flechas para ver todos los proyectos.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
-        {PLANS.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} />
-        ))}
-      </div>
+      <PlansCoverflow />
 
       <div className="mt-20">
         <div className="mb-8 text-center">

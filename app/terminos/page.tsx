@@ -64,9 +64,11 @@ export default function TerminosPage() {
         <Section title="2. Información del sitio">
           <p>
             El sitio presenta nuestros servicios (landing pages, invitaciones
-            digitales, cartas o catálogos digitales y proyectos personalizados)
-            y tiene carácter informativo. Nos esforzamos por mantener los
-            contenidos actualizados, pero pueden cambiar sin previo aviso.
+            digitales, cartas y catálogos digitales, portfolios, tarjetas
+            digitales, webs de eventos, galerías, fichas de propiedades y
+            rediseños visuales) y tiene carácter informativo. Nos esforzamos por
+            mantener los contenidos actualizados, pero pueden cambiar sin previo
+            aviso.
           </p>
         </Section>
 
