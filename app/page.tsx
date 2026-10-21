@@ -2280,6 +2280,8 @@ const COVERFLOW = {
   fade: 0.2,
   /** Espacio entre tarjetas, como fracción del ancho de la tarjeta */
   gap: 0.06,
+  /** Px de desenfoque por paso de distancia (tope: 2 pasos) */
+  blur: 3,
 } as const;
 
 const useIsoLayoutEffect =
@@ -2348,6 +2350,10 @@ const PlansCoverflow: React.FC = () => {
       // así que tiene que estar invisible para entonces.
       const edge = Math.min(1, Math.max(0, count / 2 - distance));
       card.style.opacity = String(Math.max(0, 1 - COVERFLOW.fade * distance) * edge);
+
+      // Las vecinas se ven difuminadas; la del centro queda nítida.
+      const blurPx = Math.min(distance, 2) * COVERFLOW.blur;
+      card.style.filter = blurPx < 0.1 ? "none" : `blur(${blurPx.toFixed(1)}px)`;
       card.style.zIndex = String(100 - Math.round(distance));
       // Solo la tarjeta del centro recibe clics; el arrastre lo maneja el marco.
       card.style.pointerEvents = distance < 0.5 ? "auto" : "none";
@@ -2813,49 +2819,282 @@ const ServicesGrid: React.FC = () => (
 
 /* ---------- Portfolio ---------- */
 
-const Portfolio: React.FC = () => (
-  <section
-    id="portfolio"
-    aria-labelledby="portfolio-titulo"
-    className="relative px-4 py-24 md:px-8"
-  >
-    <div className="mx-auto max-w-6xl">
-      <div className="mb-6 text-center">
-        <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300">
-          Portfolio
-        </p>
-        <h2
-          id="portfolio-titulo"
-          className="mt-3 text-3xl font-bold tracking-tight text-balance text-zinc-50 md:text-5xl"
-        >
-          Nuestras demos
-        </h2>
-        <p className="mx-auto mt-4 max-w-xl text-base text-zinc-300">
-          Deslizá las tarjetas o usá las flechas para recorrer los proyectos.
-        </p>
+/* ---------- Lista índice con imagen (IndexListCarousel) ---------- */
+// Títulos grandes numerados de un lado y una imagen del otro. Al pasar el mouse
+// (o tocar) un título, su imagen entra con un "wipe" sobre la anterior.
+// Mouse, toque, flechas ↑/↓ ←/→ y autoplay opcional que espera si el puntero está adentro.
+
+type IlSlide = {
+  image: string;
+  title: string;
+  caption?: string;
+  alt?: string;
+};
+
+type IndexListCarouselProps = {
+  slides: IlSlide[];
+  /** Cualquier medida CSS. */
+  height?: number | string;
+  /** Rótulo chico arriba de la lista. */
+  label?: string;
+  /** ms por fila; 0 apaga el autoplay. */
+  autoplay?: number;
+  background?: string;
+  ink?: string;
+  onChange?: (index: number) => void;
+  className?: string;
+  ariaLabel?: string;
+};
+
+/** Qué capa es una imagen: la que entra, la que tapa, o está oculta a la derecha/izquierda. */
+function ilLayerOf(
+  i: number,
+  active: number,
+  previous: number,
+): "on" | "was" | "after" | "before" {
+  return i === active ? "on" : i === previous ? "was" : i > active ? "after" : "before";
+}
+
+const IL_CSS = [
+  ".il-root{position:relative;width:100%;display:grid;grid-template-columns:minmax(260px,42%) 1fr;gap:clamp(16px,3vw,48px);padding:clamp(16px,4vw,48px);box-sizing:border-box;overflow:hidden;background:var(--il-bg);color:var(--il-ink);outline:none;border-radius:24px;border:1px solid rgba(255,255,255,.1)}",
+  ".il-root:focus-visible{box-shadow:inset 0 0 0 2px var(--il-ink)}",
+  ".il-list{display:flex;flex-direction:column;justify-content:center;min-height:0;overflow:auto;scrollbar-width:none}",
+  ".il-list::-webkit-scrollbar{display:none}",
+  ".il-label{display:flex;justify-content:space-between;margin-bottom:clamp(12px,2.4vh,24px);font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--il-muted)}",
+  ".il-row{appearance:none;display:grid;grid-template-columns:auto 1fr;column-gap:14px;align-items:baseline;width:100%;padding:10px 0;border:0;border-bottom:1px solid var(--il-line);background:transparent;color:var(--il-faint);text-align:left;cursor:pointer;transition:color .35s ease,padding .45s cubic-bezier(.2,.7,.2,1)}",
+  ".il-row:first-of-type{border-top:1px solid var(--il-line)}",
+  ".il-row[data-on='1']{color:var(--il-ink);padding-left:12px}",
+  ".il-row:focus-visible{outline:2px solid var(--il-ink);outline-offset:2px}",
+  ".il-num{font:500 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.1em;color:var(--il-muted)}",
+  ".il-title{font-family:inherit;font-weight:600;font-size:clamp(20px,2.6vw,36px);line-height:1.1;letter-spacing:-.01em}",
+  ".il-more{grid-column:2;display:grid;grid-template-rows:0fr;transition:grid-template-rows .45s cubic-bezier(.2,.7,.2,1)}",
+  ".il-row[data-on='1'] .il-more{grid-template-rows:1fr}",
+  ".il-more>span{overflow:hidden;font:400 14px/1.45 ui-sans-serif,system-ui,sans-serif;color:var(--il-muted);padding-top:2px}",
+  ".il-pane{position:relative;min-height:0;overflow:hidden;border-radius:12px;background:var(--il-line)}",
+  ".il-pane img{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;object-position:top;display:block;visibility:hidden;transform:scale(1.08)}",
+  ".il-pane img[data-l='on']{visibility:visible;z-index:2;clip-path:inset(0 0 0 0);transform:none;transition:clip-path .85s cubic-bezier(.7,0,.2,1),transform 1.3s cubic-bezier(.2,.7,.2,1)}",
+  ".il-pane img[data-l='was']{visibility:visible;z-index:1;transform:none}",
+  ".il-pane img[data-l='after']{clip-path:inset(0 0 0 100%)}",
+  ".il-pane img[data-l='before']{clip-path:inset(0 100% 0 0)}",
+  ".il-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}",
+  "@media (max-width:720px){.il-root{grid-template-columns:1fr;grid-template-rows:minmax(0,44%) 1fr}.il-root .il-list{order:2;justify-content:flex-start}.il-pane{order:1}}",
+  "@media (prefers-reduced-motion:reduce){.il-pane img{transition:none!important;transform:none}.il-row,.il-more{transition:none}}",
+].join("\n");
+
+const IndexListCarousel: React.FC<IndexListCarouselProps> = ({
+  slides,
+  height = "min(80svh, 640px)",
+  label = "Índice",
+  autoplay = 0,
+  background = "transparent",
+  ink = "#f4f4f5",
+  onChange,
+  className,
+  ariaLabel = "Demos",
+}) => {
+  const n = slides.length;
+  const [state, setState] = React.useState({ active: 0, previous: -1 });
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const inside = React.useRef(false);
+  const lastTouch = React.useRef(0);
+  const { active, previous } = state;
+
+  const show = React.useCallback((i: number) => {
+    setState((s) => (s.active === i ? s : { active: i, previous: s.active }));
+  }, []);
+
+  React.useEffect(() => {
+    onChange?.(active);
+  }, [active, onChange]);
+
+  React.useEffect(() => {
+    if (!autoplay || n < 2) return;
+    const root = rootRef.current;
+    let seen = true;
+    const io = new IntersectionObserver(([e]) => {
+      seen = e.isIntersecting;
+    });
+    if (root) io.observe(root);
+    const t = window.setInterval(() => {
+      if (
+        !seen ||
+        document.hidden ||
+        inside.current ||
+        performance.now() - lastTouch.current < autoplay
+      )
+        return;
+      setState((s) => ({ active: wrap(s.active + 1, n), previous: s.active }));
+    }, autoplay);
+    return () => {
+      window.clearInterval(t);
+      io.disconnect();
+    };
+  }, [autoplay, n]);
+
+  const touch = () => {
+    lastTouch.current = performance.now();
+  };
+
+  const onKey = (e: React.KeyboardEvent) => {
+    let d = 0;
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") d = 1;
+    else if (e.key === "ArrowUp" || e.key === "ArrowLeft") d = -1;
+    else return;
+    e.preventDefault();
+    touch();
+    show(wrap(active + d, n));
+  };
+
+  const current = slides[active];
+
+  return (
+    <div
+      ref={rootRef}
+      className={["il-root", className].filter(Boolean).join(" ")}
+      style={
+        {
+          height,
+          "--il-bg": background,
+          "--il-ink": ink,
+          "--il-muted": "color-mix(in srgb, var(--il-ink) 65%, transparent)",
+          "--il-faint": "color-mix(in srgb, var(--il-ink) 45%, transparent)",
+          "--il-line": "color-mix(in srgb, var(--il-ink) 14%, transparent)",
+        } as React.CSSProperties
+      }
+      role="region"
+      aria-roledescription="carousel"
+      aria-label={ariaLabel}
+      tabIndex={0}
+      onKeyDown={onKey}
+      onPointerEnter={(e) => {
+        if (e.pointerType === "mouse") inside.current = true;
+      }}
+      onPointerLeave={() => {
+        inside.current = false;
+      }}
+    >
+      <style>{IL_CSS}</style>
+      <div className="il-list">
+        <div className="il-label" aria-hidden="true">
+          <span>{label}</span>
+          <span>{pad2(n)}</span>
+        </div>
+        {slides.map((sl, i) => (
+          <button
+            key={sl.title}
+            type="button"
+            className="il-row"
+            data-on={i === active ? "1" : "0"}
+            aria-current={i === active ? "true" : undefined}
+            onMouseEnter={() => show(i)}
+            onFocus={() => show(i)}
+            onClick={() => {
+              touch();
+              show(i);
+            }}
+          >
+            <span className="il-num">{pad2(i + 1)}</span>
+            <span className="il-title">{sl.title}</span>
+            {sl.caption ? (
+              <span className="il-more">
+                <span>{sl.caption}</span>
+              </span>
+            ) : null}
+          </button>
+        ))}
       </div>
-      <CardDeckCarousel
-        slides={DEMO_SLIDES}
-        cardWidth="min(78vw, 400px)"
-        aspect="3 / 4"
-        scatter={8}
-        autoplay={0}
-        background="transparent"
-        ink="#f4f4f5"
-      />
-      <div className="mt-10 flex flex-col items-center gap-4 text-center">
-        <p className="text-base text-zinc-300">
-          ¿Querés una web así para tu negocio o tu evento?
-        </p>
-        <MagneticWrap>
-          <OriginButton variant="solid" onClick={() => goTo("contacto")}>
-            Consultar presupuesto
-          </OriginButton>
-        </MagneticWrap>
+      <div className="il-pane">
+        {slides.map((sl, i) => (
+          <Image
+            key={sl.title}
+            src={sl.image}
+            alt={i === active ? sl.alt || sl.title : ""}
+            fill
+            sizes="(max-width: 720px) 100vw, 60vw"
+            quality={75}
+            draggable={false}
+            data-l={ilLayerOf(i, active, previous)}
+          />
+        ))}
+      </div>
+      <div className="il-sr" aria-live="polite">
+        {`${current?.title ?? "Demo"}, ${active + 1} de ${n}`}
       </div>
     </div>
-  </section>
-);
+  );
+};
+
+const IL_SLIDES: IlSlide[] = DEMO_SLIDES.filter((s) => s.image).map((s) => ({
+  image: s.image as string,
+  title: s.title,
+  caption: s.caption,
+  alt: s.alt,
+}));
+
+const Portfolio: React.FC = () => {
+  const [current, setCurrent] = React.useState(0);
+  const demo = DEMO_SLIDES[current];
+
+  return (
+    <section
+      id="portfolio"
+      aria-labelledby="portfolio-titulo"
+      className="relative px-4 py-24 md:px-8"
+    >
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-10 text-center">
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300">
+            Portfolio
+          </p>
+          <h2
+            id="portfolio-titulo"
+            className="mt-3 text-3xl font-bold tracking-tight text-balance text-zinc-50 md:text-5xl"
+          >
+            Nuestras demos
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-base text-zinc-300">
+            Pasá el mouse o tocá un título para ver cada proyecto.
+          </p>
+        </div>
+
+        <IndexListCarousel
+          slides={IL_SLIDES}
+          label="Demos"
+          ariaLabel="Nuestras demos"
+          onChange={setCurrent}
+        />
+
+        {demo?.href ? (
+          <div className="mt-8 flex justify-center">
+            <MagneticWrap>
+              <OriginButton
+                variant="outline"
+                aria-label={`Ver la demo de ${demo.title} (se abre en una pestaña nueva)`}
+                onClick={() => {
+                  track("demo_click", { demo: demo.title });
+                  window.open(demo.href, "_blank", "noopener,noreferrer");
+                }}
+              >
+                Ver demo de {demo.title} ↗
+              </OriginButton>
+            </MagneticWrap>
+          </div>
+        ) : null}
+
+        <div className="mt-10 flex flex-col items-center gap-4 text-center">
+          <p className="text-base text-zinc-300">
+            ¿Querés una web así para tu negocio o tu evento?
+          </p>
+          <MagneticWrap>
+            <OriginButton variant="solid" onClick={() => goTo("contacto")}>
+              Consultar presupuesto
+            </OriginButton>
+          </MagneticWrap>
+        </div>
+      </div>
+    </section>
+  );
+};
 
 /* ---------- Quiénes somos ---------- */
 
