@@ -1992,6 +1992,7 @@ const PLANS: Plan[] = [
     ],
     topic: "un portfolio o sitio profesional",
     span: "md:col-span-2",
+    pdf: "/propuestas/04-Portfolio-o-sitio-profesional.pdf",
     needs: ["negocio", "trabajos"],
   },
   {
@@ -2007,6 +2008,7 @@ const PLANS: Plan[] = [
     ],
     topic: "una tarjeta digital con QR",
     span: "md:col-span-2",
+    pdf: "/propuestas/05-Tarjeta-digital-con-QR.pdf",
     needs: ["qr"],
   },
   {
@@ -2023,6 +2025,7 @@ const PLANS: Plan[] = [
     note: "Las inscripciones y los pagos se coordinan por WhatsApp: el sitio no los procesa.",
     topic: "una landing para un curso o capacitación",
     span: "md:col-span-2",
+    pdf: "/propuestas/06-Landing-para-cursos-y-capacitaciones.pdf",
     needs: ["curso", "negocio"],
   },
   {
@@ -2039,6 +2042,7 @@ const PLANS: Plan[] = [
     note: "El pedido se confirma por WhatsApp: no incluye pagos online ni control de stock.",
     topic: "un catálogo con carrito a WhatsApp",
     span: "md:col-span-2",
+    pdf: "/propuestas/07-Catalogo-con-carrito-a-WhatsApp.pdf",
     needs: ["productos", "pedidos"],
   },
   {
@@ -2054,6 +2058,7 @@ const PLANS: Plan[] = [
     ],
     topic: "una web de evento o lanzamiento",
     span: "md:col-span-2",
+    pdf: "/propuestas/08-Web-de-evento-o-lanzamiento.pdf",
     needs: ["evento", "cuenta", "confirmar"],
   },
   {
@@ -2069,6 +2074,7 @@ const PLANS: Plan[] = [
     ],
     topic: "una galería o lookbook",
     span: "md:col-span-2",
+    pdf: "/propuestas/09-Galeria-o-lookbook.pdf",
     needs: ["trabajos"],
   },
   {
@@ -2085,6 +2091,7 @@ const PLANS: Plan[] = [
     note: "El contenido es estático: las propiedades se actualizan con nosotros, sin panel de administración.",
     topic: "fichas de propiedades para una inmobiliaria",
     span: "md:col-span-2",
+    pdf: "/propuestas/10-Fichas-de-propiedades.pdf",
     needs: ["propiedades"],
   },
   {
@@ -2101,6 +2108,7 @@ const PLANS: Plan[] = [
     note: "Trabajamos solo la parte visual: no incluye cambios de sistema ni de servidor.",
     topic: "un rediseño visual de mi web",
     span: "md:col-span-2",
+    pdf: "/propuestas/11-Rediseno-visual-de-tu-web.pdf",
     needs: ["rediseno"],
   },
 ];
