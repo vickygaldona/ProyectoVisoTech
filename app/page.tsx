@@ -42,6 +42,8 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { CircleMenu, type CircleMenuItem } from "./components/ui/circle-menu";
+import { EMAIL, FACEBOOK_URL, INSTAGRAM_URL } from "./site-links";
 
 /* ============================================================
    CONTACTOS Y HELPERS GLOBALES
@@ -1156,213 +1158,60 @@ const AnimatedGroup: React.FC<{
 );
 
 /* ============================================================
-   MINIMALIST DOCK (fijo, abajo al centro)
+   MENÚ CIRCULAR (fijo, abajo al centro; reemplaza al dock)
+   Los accesos de WhatsApp salen de CONTACTS: si se agrega una persona
+   ahí, aparece sola en el menú.
    ============================================================ */
 
-type DockItemData = {
-  id: string;
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-};
-
-const dockItems: DockItemData[] = [
+const MENU_ITEMS: CircleMenuItem[] = [
   {
     id: "inicio",
-    icon: <Home size={20} />,
     label: "Inicio",
+    ariaLabel: "Ir a Inicio",
+    icon: <Home size={18} aria-hidden="true" />,
     onClick: () => goTo("inicio"),
   },
   {
     id: "servicios",
-    icon: <LayoutGrid size={20} />,
-    label: "Servicios y planes",
+    label: "Servicios",
+    ariaLabel: "Ir a Servicios y planes",
+    icon: <LayoutGrid size={18} aria-hidden="true" />,
     onClick: () => goTo("servicios"),
   },
   {
     id: "portfolio",
-    icon: <Layers size={20} />,
     label: "Portfolio",
+    ariaLabel: "Ir al Portfolio",
+    icon: <Layers size={18} aria-hidden="true" />,
     onClick: () => goTo("portfolio"),
   },
   {
     id: "quienes-somos",
-    icon: <Users size={20} />,
-    label: "Quiénes somos",
+    label: "Nosotros",
+    ariaLabel: "Ir a Quiénes somos",
+    icon: <Users size={18} aria-hidden="true" />,
     onClick: () => goTo("quienes-somos"),
   },
   {
     id: "consulta",
-    icon: <MessageSquare size={20} />,
     label: "Consulta",
+    ariaLabel: "Ir al formulario de consulta",
+    icon: <MessageSquare size={18} aria-hidden="true" />,
     onClick: () => goTo("consulta"),
   },
+  ...CONTACTS.map(
+    (contact): CircleMenuItem => ({
+      id: "wa-" + contact.id,
+      label: contact.name,
+      ariaLabel: "Escribir a " + contact.name + " por WhatsApp",
+      icon: <MessageCircle size={18} aria-hidden="true" />,
+      className: "text-emerald-300",
+      onClick: () => openWhatsApp(contact.id),
+    }),
+  ),
 ];
 
-const DockItemComponent: React.FC<{
-  item: DockItemData;
-  isHovered: boolean;
-  onHover: (id: string | null) => void;
-  hideTooltip?: boolean;
-  expanded?: boolean;
-  controls?: string;
-  trigger?: boolean;
-  children?: React.ReactNode;
-}> = ({
-  item,
-  isHovered,
-  onHover,
-  hideTooltip = false,
-  expanded,
-  controls,
-  trigger,
-  children,
-}) => {
-  return (
-    <div
-      data-magnetic
-      className="relative rounded-lg"
-      onMouseEnter={() => onHover(item.id)}
-      onMouseLeave={() => onHover(null)}
-    >
-      <button
-        type="button"
-        aria-label={item.label}
-        aria-expanded={expanded}
-        aria-controls={controls}
-        data-wa-trigger={trigger ? "" : undefined}
-        onClick={item.onClick}
-        onFocus={() => onHover(item.id)}
-        onBlur={() => onHover(null)}
-        className={cn(
-          "relative flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white backdrop-blur-[2px] transition-all duration-300 ease-out",
-          focusRing,
-          isHovered &&
-            "-translate-y-1 scale-110 border-white/20 bg-white/10 shadow-lg shadow-white/10",
-        )}
-      >
-        <span
-          className={cn(
-            "transition-all duration-300",
-            isHovered && "scale-105 drop-shadow-[0_1px_4px_rgba(255,255,255,0.10)]",
-          )}
-        >
-          {item.icon}
-        </span>
-      </button>
-
-      <div
-        aria-hidden="true"
-        className={cn(
-          "pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/5 bg-black/70 px-2.5 py-1 text-xs font-normal text-white shadow-sm backdrop-blur transition-all duration-200",
-          isHovered && !hideTooltip
-            ? "translate-y-0 opacity-100"
-            : "translate-y-1 opacity-0",
-        )}
-      >
-        {item.label}
-        <div className="absolute left-1/2 top-full -translate-x-1/2">
-          <div className="h-2 w-2 rotate-45 border-b border-r border-white/5 bg-black/70" />
-        </div>
-      </div>
-
-      {children}
-    </div>
-  );
-};
-
-const MinimalistDock: React.FC = () => {
-  const [hoveredItem, setHoveredItem] = React.useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = React.useState(false);
-  const navRef = React.useRef<HTMLElement>(null);
-
-  React.useEffect(() => {
-    if (!menuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!navRef.current?.contains(event.target as Node)) setMenuOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setMenuOpen(false);
-      navRef.current
-        ?.querySelector<HTMLButtonElement>("[data-wa-trigger]")
-        ?.focus();
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [menuOpen]);
-
-  const whatsappItem: DockItemData = {
-    id: "whatsapp",
-    icon: <MessageCircle size={20} />,
-    label: "WhatsApp: elegir con quién hablar",
-    onClick: () => setMenuOpen((open) => !open),
-  };
-
-  return (
-    <nav
-      ref={navRef}
-      aria-label="Navegación principal"
-      className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2"
-    >
-      <div
-        className={cn(
-          "flex items-end gap-1.5 rounded-2xl border border-white/10 bg-black/40 px-3 py-3 sm:gap-3 shadow-2xl backdrop-blur-xl transition-transform duration-500 ease-out sm:px-5",
-          hoveredItem && "scale-105",
-        )}
-      >
-        {dockItems.map((item) => (
-          <DockItemComponent
-            key={item.id}
-            item={item}
-            isHovered={hoveredItem === item.id}
-            onHover={setHoveredItem}
-          />
-        ))}
-
-        <DockItemComponent
-          item={whatsappItem}
-          isHovered={hoveredItem === whatsappItem.id}
-          onHover={setHoveredItem}
-          hideTooltip={menuOpen}
-          expanded={menuOpen}
-          controls="dock-wa-menu"
-          trigger
-        >
-          {menuOpen ? (
-            <div
-              id="dock-wa-menu"
-              role="group"
-              aria-label="Elegir con quién hablar por WhatsApp"
-              className="absolute bottom-[calc(100%+0.75rem)] right-0 w-60 rounded-2xl border border-white/10 bg-black/85 p-2 shadow-2xl backdrop-blur-xl"
-            >
-              {CONTACTS.map((contact) => (
-                <a
-                  key={contact.id}
-                  href={waLink(contact.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setMenuOpen(false)}
-                  className={cn(
-                    "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm text-zinc-100 transition-colors hover:bg-white/10",
-                    focusRing,
-                  )}
-                >
-                  <MessageCircle size={16} aria-hidden="true" />
-                  Escribir a {contact.name}
-                </a>
-              ))}
-            </div>
-          ) : null}
-        </DockItemComponent>
-      </div>
-    </nav>
-  );
-};
+const SiteMenu: React.FC = () => <CircleMenu items={MENU_ITEMS} />;
 
 /* ============================================================
    DATOS DE LAS DEMOS Y HELPERS
@@ -2901,6 +2750,34 @@ const AnimatedWaveFooter: React.FC = () => {
                 <p>Argentina</p>
               </address>
             </div>
+            <div className="col-span-2">
+              <h3 className="mb-4 text-lg font-semibold text-zinc-50">
+                Redes y correo
+              </h3>
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-300">
+                <a
+                  href={INSTAGRAM_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="VisoTech en Instagram (se abre en una pestaña nueva)"
+                  className={footerLink}
+                >
+                  Instagram
+                </a>
+                <a
+                  href={FACEBOOK_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="VisoTech en Facebook (se abre en una pestaña nueva)"
+                  className={footerLink}
+                >
+                  Facebook
+                </a>
+                <a href={"mailto:" + EMAIL} className={footerLink}>
+                  {EMAIL}
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -3009,7 +2886,7 @@ export default function Page() {
             </div>
           </div>
 
-          <MinimalistDock />
+          <SiteMenu />
         </div>
       </StaticCursor>
     </MotionConfig>
