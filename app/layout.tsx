@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { SITE_URL } from "./site-url";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,11 +21,14 @@ const description =
   "Diseñamos landing pages para negocios, cartas y catálogos digitales e invitaciones para eventos. Desde San Rafael, Mendoza. Consultá por WhatsApp.";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  alternates: { canonical: "/" },
   title,
   description,
   openGraph: {
     title,
     description,
+    url: "/",
     siteName: "VisoTech",
     locale: "es_AR",
     type: "website",
