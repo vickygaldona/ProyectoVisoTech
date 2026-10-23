@@ -42,6 +42,8 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { CircleMenu, type CircleMenuItem } from "./components/ui/circle-menu";
+import { EMAIL, FACEBOOK_URL, INSTAGRAM_URL } from "./site-links";
 
 /* ============================================================
    CONTACTOS Y HELPERS GLOBALES
@@ -238,14 +240,14 @@ function ContactForm() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                maxLength={80}
+                maxLength={60}
                 autoComplete="name"
                 aria-invalid={errors.name ? true : undefined}
                 aria-describedby={errors.name ? "cf-name-err" : undefined}
                 className={fieldClass}
               />
               {errors.name ? (
-                <p id="cf-name-err" className="mt-1.5 text-sm text-red-300">{errors.name}</p>
+                <p id="cf-name-err" role="alert" className="mt-1.5 text-sm text-red-300">{errors.name}</p>
               ) : null}
             </div>
 
@@ -285,13 +287,13 @@ function ContactForm() {
                 rows={4}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                maxLength={600}
+                maxLength={500}
                 aria-invalid={errors.message ? true : undefined}
                 aria-describedby={errors.message ? "cf-message-err" : undefined}
                 className={fieldClass}
               />
               <div className="mt-1.5 flex justify-between gap-3 text-sm">
-                <span id="cf-message-err" className="text-red-300">{errors.message}</span>
+                <span id="cf-message-err" role="alert" className="text-red-300">{errors.message}</span>
                 <span className="shrink-0 text-zinc-400">{cleanMessage.length}/500</span>
               </div>
             </div>
@@ -344,6 +346,7 @@ html{scroll-behavior:smooth;background:#000}
 .vt-fade-in{animation:vt-fade 1.2s ease-out both}
 .vt-paused,.vt-paused *{animation-play-state:paused !important}
 html.vt-cursor,html.vt-cursor *{cursor:none !important}
+html.vt-cursor input,html.vt-cursor textarea{cursor:text !important}html.vt-cursor select{cursor:pointer !important}
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   .vt-pulse,.vt-wave-a,.vt-wave-b{animation:none}
@@ -1127,7 +1130,7 @@ const groupContainer: Variants = {
 };
 
 const groupItem: Variants = {
-  hidden: { opacity: 0, filter: "blur(8px)", y: 12 },
+  hidden: { opacity: 1, filter: "blur(8px)", y: 12 },
   visible: {
     opacity: 1,
     filter: "blur(0px)",
@@ -1155,216 +1158,63 @@ const AnimatedGroup: React.FC<{
 );
 
 /* ============================================================
-   MINIMALIST DOCK (fijo, abajo al centro)
+   MENÚ CIRCULAR (fijo, abajo al centro; reemplaza al dock)
+   Los accesos de WhatsApp salen de CONTACTS: si se agrega una persona
+   ahí, aparece sola en el menú.
    ============================================================ */
 
-type DockItemData = {
-  id: string;
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-};
-
-const dockItems: DockItemData[] = [
+const MENU_ITEMS: CircleMenuItem[] = [
   {
     id: "inicio",
-    icon: <Home size={20} />,
     label: "Inicio",
+    ariaLabel: "Ir a Inicio",
+    icon: <Home size={18} aria-hidden="true" />,
     onClick: () => goTo("inicio"),
   },
   {
     id: "servicios",
-    icon: <LayoutGrid size={20} />,
-    label: "Servicios y planes",
+    label: "Servicios",
+    ariaLabel: "Ir a Servicios y planes",
+    icon: <LayoutGrid size={18} aria-hidden="true" />,
     onClick: () => goTo("servicios"),
   },
   {
     id: "portfolio",
-    icon: <Layers size={20} />,
     label: "Portfolio",
+    ariaLabel: "Ir al Portfolio",
+    icon: <Layers size={18} aria-hidden="true" />,
     onClick: () => goTo("portfolio"),
   },
   {
     id: "quienes-somos",
-    icon: <Users size={20} />,
-    label: "Quiénes somos",
+    label: "Nosotros",
+    ariaLabel: "Ir a Quiénes somos",
+    icon: <Users size={18} aria-hidden="true" />,
     onClick: () => goTo("quienes-somos"),
   },
   {
     id: "consulta",
-    icon: <MessageSquare size={20} />,
     label: "Consulta",
+    ariaLabel: "Ir al formulario de consulta",
+    icon: <MessageSquare size={18} aria-hidden="true" />,
     onClick: () => goTo("consulta"),
   },
+  ...CONTACTS.map(
+    (contact): CircleMenuItem => ({
+      id: "wa-" + contact.id,
+      label: contact.name,
+      ariaLabel: "Escribir a " + contact.name + " por WhatsApp",
+      icon: <MessageCircle size={18} aria-hidden="true" />,
+      className: "text-emerald-300",
+      onClick: () => openWhatsApp(contact.id),
+    }),
+  ),
 ];
 
-const DockItemComponent: React.FC<{
-  item: DockItemData;
-  isHovered: boolean;
-  onHover: (id: string | null) => void;
-  hideTooltip?: boolean;
-  expanded?: boolean;
-  controls?: string;
-  trigger?: boolean;
-  children?: React.ReactNode;
-}> = ({
-  item,
-  isHovered,
-  onHover,
-  hideTooltip = false,
-  expanded,
-  controls,
-  trigger,
-  children,
-}) => {
-  return (
-    <div
-      data-magnetic
-      className="relative rounded-lg"
-      onMouseEnter={() => onHover(item.id)}
-      onMouseLeave={() => onHover(null)}
-    >
-      <button
-        type="button"
-        aria-label={item.label}
-        aria-expanded={expanded}
-        aria-controls={controls}
-        data-wa-trigger={trigger ? "" : undefined}
-        onClick={item.onClick}
-        onFocus={() => onHover(item.id)}
-        onBlur={() => onHover(null)}
-        className={cn(
-          "relative flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white backdrop-blur-[2px] transition-all duration-300 ease-out",
-          focusRing,
-          isHovered &&
-            "-translate-y-1 scale-110 border-white/20 bg-white/10 shadow-lg shadow-white/10",
-        )}
-      >
-        <span
-          className={cn(
-            "transition-all duration-300",
-            isHovered && "scale-105 drop-shadow-[0_1px_4px_rgba(255,255,255,0.10)]",
-          )}
-        >
-          {item.icon}
-        </span>
-      </button>
-
-      <div
-        aria-hidden="true"
-        className={cn(
-          "pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/5 bg-black/70 px-2.5 py-1 text-xs font-normal text-white shadow-sm backdrop-blur transition-all duration-200",
-          isHovered && !hideTooltip
-            ? "translate-y-0 opacity-100"
-            : "translate-y-1 opacity-0",
-        )}
-      >
-        {item.label}
-        <div className="absolute left-1/2 top-full -translate-x-1/2">
-          <div className="h-2 w-2 rotate-45 border-b border-r border-white/5 bg-black/70" />
-        </div>
-      </div>
-
-      {children}
-    </div>
-  );
-};
-
-const MinimalistDock: React.FC = () => {
-  const [hoveredItem, setHoveredItem] = React.useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = React.useState(false);
-  const navRef = React.useRef<HTMLElement>(null);
-
-  React.useEffect(() => {
-    if (!menuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!navRef.current?.contains(event.target as Node)) setMenuOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setMenuOpen(false);
-      navRef.current
-        ?.querySelector<HTMLButtonElement>("[data-wa-trigger]")
-        ?.focus();
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [menuOpen]);
-
-  const whatsappItem: DockItemData = {
-    id: "whatsapp",
-    icon: <MessageCircle size={20} />,
-    label: "WhatsApp: elegir con quién hablar",
-    onClick: () => setMenuOpen((open) => !open),
-  };
-
-  return (
-    <nav
-      ref={navRef}
-      aria-label="Navegación principal"
-      className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-50 -translate-x-1/2"
-    >
-      <div
-        className={cn(
-          "flex items-end gap-3 rounded-2xl border border-white/10 bg-black/40 px-4 py-3 shadow-2xl backdrop-blur-xl transition-transform duration-500 ease-out sm:px-5",
-          hoveredItem && "scale-105",
-        )}
-      >
-        {dockItems.map((item) => (
-          <DockItemComponent
-            key={item.id}
-            item={item}
-            isHovered={hoveredItem === item.id}
-            onHover={setHoveredItem}
-          />
-        ))}
-
-        <DockItemComponent
-          item={whatsappItem}
-          isHovered={hoveredItem === whatsappItem.id}
-          onHover={setHoveredItem}
-          hideTooltip={menuOpen}
-          expanded={menuOpen}
-          controls="dock-wa-menu"
-          trigger
-        >
-          {menuOpen ? (
-            <div
-              id="dock-wa-menu"
-              role="group"
-              aria-label="Elegir con quién hablar por WhatsApp"
-              className="absolute bottom-[calc(100%+0.75rem)] right-0 w-60 rounded-2xl border border-white/10 bg-black/85 p-2 shadow-2xl backdrop-blur-xl"
-            >
-              {CONTACTS.map((contact) => (
-                <a
-                  key={contact.id}
-                  href={waLink(contact.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setMenuOpen(false)}
-                  className={cn(
-                    "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm text-zinc-100 transition-colors hover:bg-white/10",
-                    focusRing,
-                  )}
-                >
-                  <MessageCircle size={16} aria-hidden="true" />
-                  Escribir a {contact.name}
-                </a>
-              ))}
-            </div>
-          ) : null}
-        </DockItemComponent>
-      </div>
-    </nav>
-  );
-};
+const SiteMenu: React.FC = () => <CircleMenu items={MENU_ITEMS} />;
 
 /* ============================================================
-   CARD DECK CAROUSEL
+   DATOS DE LAS DEMOS Y HELPERS
    ============================================================ */
 
 type Slide = {
@@ -1375,42 +1225,8 @@ type Slide = {
   href?: string;
 };
 
-type CardDeckCarouselProps = {
-  slides?: Slide[];
-  cardWidth?: string;
-  aspect?: string;
-  scatter?: number;
-  autoplay?: number;
-  background?: string;
-  ink?: string;
-  onChange?: (index: number) => void;
-  className?: string;
-  style?: React.CSSProperties;
-  ariaLabel?: string;
-};
-
 function wrap(i: number, n: number): number {
   return n ? ((i % n) + n) % n : 0;
-}
-
-function deckPose(depth: number, tilt: number, reduce = false) {
-  const d = Math.min(depth, 3);
-  return {
-    y: d ? -d * 16 : 0,
-    scale: 1 - d * 0.055,
-    rot: depth === 0 || reduce ? 0 : tilt,
-    opacity: depth > 3 ? 0 : 1,
-    shade: 1 - d * 0.07,
-  };
-}
-
-function tiltFor(i: number, max: number): number {
-  const u = (((i + 1) * 2654435761) >>> 0) / 4294967296;
-  return (u * 2 - 1) * max;
-}
-
-function isThrow(dx: number, vx: number, w: number): boolean {
-  return Math.abs(dx) > w * 0.28 || (Math.abs(vx) > 0.55 && Math.abs(dx) > 24);
 }
 
 function pad2(n: number): string {
@@ -1455,389 +1271,6 @@ const DEMO_SLIDES: Slide[] = [
     alt: "Captura del sitio web de Vivero El Paraíso",
   },
 ];
-
-const CD_CSS = [
-  ".cd-root{position:relative;width:100%;display:flex;flex-direction:column;align-items:center;gap:28px;overflow-x:clip;background:var(--cd-bg);color:var(--cd-ink);outline:none;padding:56px 16px 8px;box-sizing:border-box}",
-  ".cd-root:focus-visible{box-shadow:inset 0 0 0 2px var(--cd-ink)}",
-  ".cd-deck{position:relative;width:var(--cd-w);max-width:100%;aspect-ratio:var(--cd-aspect);touch-action:pan-y}",
-  ".cd-card{position:absolute;inset:0;border-radius:18px;overflow:hidden;background:#1a1a1f;box-shadow:0 1px 2px rgba(0,0,0,.2),0 30px 60px -30px rgba(0,0,0,.8);border:1px solid rgba(255,255,255,.08);transition:transform .6s cubic-bezier(.2,.8,.2,1),opacity .4s ease,filter .4s ease;will-change:transform}",
-  ".cd-card[data-top='1']{cursor:grab}",
-  ".cd-card[data-drag='1']{cursor:grabbing;transition:none}",
-  ".cd-card[data-fly='1']{transition:transform .45s cubic-bezier(.3,.5,.3,1),opacity .45s ease}",
-  ".cd-card[data-snap='1']{transition:none}",
-  ".cd-card img{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;object-position:top;display:block;pointer-events:none;user-select:none}",
-  ".cd-fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;text-align:center;background:#111114}",
-  ".cd-fallback strong{font-weight:600;font-size:clamp(18px,3vw,22px);line-height:1.25;text-wrap:balance}",
-  ".cd-fallback span{font-size:14px;color:var(--cd-muted)}",
-  ".cd-meta{display:flex;flex-direction:column;gap:20px;width:var(--cd-w);max-width:100%}",
-  ".cd-cap{display:grid}",
-  ".cd-cap-item{grid-area:1/1;visibility:hidden;opacity:0}",
-  ".cd-cap-item[data-on='1']{visibility:visible;opacity:1;animation:cd-in .5s cubic-bezier(.2,.8,.2,1) both}",
-  ".cd-title{margin:0;font-weight:600;font-size:clamp(18px,2.2vw,24px);line-height:1.25;letter-spacing:-.01em;text-wrap:balance;overflow-wrap:break-word}",
-  ".cd-sub{margin:6px 0 0;font-size:15px;line-height:1.55;color:var(--cd-muted);overflow-wrap:break-word}",
-  ".cd-nav{display:flex;align-items:center;justify-content:space-between;gap:16px}",
-  ".cd-count{font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;color:var(--cd-muted)}",
-  ".cd-count b{color:var(--cd-ink);font-weight:500}",
-  ".cd-btn{appearance:none;border:1px solid var(--cd-line);background:transparent;color:inherit;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;cursor:pointer;flex:none;touch-action:manipulation;transition:background .2s ease,color .2s ease}",
-  "@media (hover:hover){.cd-btn:hover{background:var(--cd-ink);color:#000}}",
-  ".cd-btn:focus-visible{outline:2px solid var(--cd-ink);outline-offset:2px}",
-  ".cd-demo{display:flex;justify-content:center}",
-  ".cd-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}",
-  "@keyframes cd-in{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}",
-  "@media (prefers-reduced-motion:reduce){.cd-card,.cd-card[data-fly='1']{transition:opacity .3s ease}.cd-cap-item[data-on='1']{animation:none}}",
-].join("\n");
-
-type Override = {
-  i: number;
-  x: number;
-  y: number;
-  r: number;
-  mode: "drag" | "fly" | "snap";
-};
-
-const CardDeckCarousel: React.FC<CardDeckCarouselProps> = ({
-  slides = DEMO_SLIDES,
-  cardWidth = "min(78vw, 400px)",
-  aspect = "3 / 4",
-  scatter = 6,
-  autoplay = 4200,
-  background = "#000",
-  ink = "#f4f4f5",
-  onChange,
-  className,
-  style,
-  ariaLabel = "Carrusel de demos",
-}) => {
-  const n = slides.length;
-  const [top, setTop] = React.useState(0);
-  const [over, setOver] = React.useState<Override | null>(null);
-  const [reduce, setReduce] = React.useState(false);
-  const [failed, setFailed] = React.useState<Record<number, boolean>>({});
-  const rootRef = React.useRef<HTMLDivElement | null>(null);
-  const deckRef = React.useRef<HTMLDivElement | null>(null);
-  const busy = React.useRef(false);
-  const lastTouch = React.useRef(0);
-  const topRef = React.useRef(0);
-  topRef.current = top;
-
-  const markFailed = React.useCallback(
-    (i: number) => setFailed((f) => (f[i] ? f : { ...f, [i]: true })),
-    [],
-  );
-
-  React.useEffect(() => {
-    setReduce(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  }, []);
-
-  // Si la imagen falló antes de hidratar, onError no se dispara: lo revisamos al montar.
-  React.useEffect(() => {
-    rootRef.current
-      ?.querySelectorAll<HTMLImageElement>("img[data-i]")
-      .forEach((img) => {
-        if (img.complete && img.naturalWidth === 0) {
-          markFailed(Number(img.dataset.i));
-        }
-      });
-  }, [markFailed]);
-
-  const later = (fn: () => void, ms: number) => window.setTimeout(fn, ms);
-
-  const throwTop = React.useCallback(
-    (dirX: number, fromX = 0, fromY = 0, dirY = 0) => {
-      const w = deckRef.current?.offsetWidth || 400;
-      if (busy.current || n < 2) return;
-      busy.current = true;
-      const i = topRef.current;
-      const sx = dirX >= 0 ? 1 : -1;
-      setOver({
-        i,
-        x: fromX + sx * w * 1.25,
-        y: fromY + dirY * 0.4 - 40,
-        r: sx * 16,
-        mode: "fly",
-      });
-      later(
-        () => {
-          setOver(null);
-          setTop((t) => wrap(t + 1, n));
-          busy.current = false;
-        },
-        reduce ? 200 : 430,
-      );
-    },
-    [n, reduce],
-  );
-
-  const pullBack = React.useCallback(() => {
-    if (busy.current || n < 2) return;
-    busy.current = true;
-    const i = wrap(topRef.current - 1, n);
-    const w = deckRef.current?.offsetWidth || 400;
-    setOver({ i, x: -w * 1.25, y: -40, r: -16, mode: "snap" });
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        setOver({ i, x: 0, y: 0, r: 0, mode: "fly" });
-        later(
-          () => {
-            setOver(null);
-            setTop(i);
-            busy.current = false;
-          },
-          reduce ? 200 : 450,
-        );
-      }),
-    );
-  }, [n, reduce]);
-
-  React.useEffect(() => {
-    onChange?.(top);
-  }, [top, onChange]);
-
-  React.useEffect(() => {
-    if (!autoplay || n < 2) return;
-    const root = rootRef.current;
-    let seen = true;
-    const io = new IntersectionObserver(([e]) => {
-      seen = e.isIntersecting;
-    });
-    if (root) io.observe(root);
-    const t = window.setInterval(() => {
-      if (
-        !seen ||
-        document.hidden ||
-        performance.now() - lastTouch.current < autoplay
-      )
-        return;
-      throwTop(1);
-    }, autoplay);
-    return () => {
-      window.clearInterval(t);
-      io.disconnect();
-    };
-  }, [autoplay, n, throwTop]);
-
-  const drag = React.useRef<null | {
-    x: number;
-    y: number;
-    lx: number;
-    lt: number;
-    vx: number;
-  }>(null);
-
-  const onDown = (e: React.PointerEvent) => {
-    lastTouch.current = performance.now();
-    if (busy.current || (e.pointerType === "mouse" && e.button !== 0)) return;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    drag.current = {
-      x: e.clientX,
-      y: e.clientY,
-      lx: e.clientX,
-      lt: e.timeStamp,
-      vx: 0,
-    };
-  };
-
-  const onMove = (e: React.PointerEvent) => {
-    const d = drag.current;
-    if (!d) return;
-    const dt = Math.max(1, e.timeStamp - d.lt);
-    d.vx = 0.8 * ((e.clientX - d.lx) / dt) + 0.2 * d.vx;
-    d.lx = e.clientX;
-    d.lt = e.timeStamp;
-    const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    setOver({
-      i: topRef.current,
-      x: dx,
-      y: dy * 0.3,
-      r: reduce ? 0 : dx * 0.05,
-      mode: "drag",
-    });
-  };
-
-  const onUp = (e: React.PointerEvent) => {
-    const d = drag.current;
-    drag.current = null;
-    lastTouch.current = performance.now();
-    if (!d) return;
-    const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    const w = deckRef.current?.offsetWidth || 400;
-    if (isThrow(dx, d.vx, w)) throwTop(dx, dx, dy * 0.3, dy);
-    else setOver(null);
-  };
-
-  // En pantallas táctiles el navegador cancela el gesto cuando el usuario hace
-  // scroll vertical: ahí no hay que tirar la tarjeta, solo devolverla a su lugar.
-  const onCancel = () => {
-    drag.current = null;
-    lastTouch.current = performance.now();
-    setOver(null);
-  };
-
-  const onKey = (e: React.KeyboardEvent) => {
-    lastTouch.current = performance.now();
-    if (e.key === "ArrowRight") throwTop(1);
-    else if (e.key === "ArrowLeft") pullBack();
-    else return;
-    e.preventDefault();
-  };
-
-  const s = slides[top] || { title: "" };
-
-  const rootStyle = {
-    "--cd-w": cardWidth,
-    "--cd-aspect": aspect,
-    "--cd-bg": background,
-    "--cd-ink": ink,
-    "--cd-muted": "color-mix(in srgb, var(--cd-ink) 80%, transparent)",
-    "--cd-line": "color-mix(in srgb, var(--cd-ink) 25%, transparent)",
-    ...style,
-  } as React.CSSProperties;
-
-  return (
-    <div
-      ref={rootRef}
-      className={["cd-root", className].filter(Boolean).join(" ")}
-      style={rootStyle}
-      role="region"
-      aria-roledescription="carousel"
-      aria-label={ariaLabel}
-      tabIndex={0}
-      onKeyDown={onKey}
-    >
-      <style>{CD_CSS}</style>
-      <div ref={deckRef} className="cd-deck">
-        {slides.map((sl, i) => {
-          const depth = wrap(i - top, n);
-          const p = deckPose(depth, tiltFor(i, scatter), reduce);
-          const o = over && over.i === i ? over : null;
-          const isTop = depth === 0;
-          const transform = o
-            ? "translate(" + o.x + "px," + o.y + "px) rotate(" + o.r + "deg)"
-            : "translateY(" +
-              p.y +
-              "px) scale(" +
-              p.scale +
-              ") rotate(" +
-              p.rot.toFixed(2) +
-              "deg)";
-          return (
-            <div
-              key={i}
-              className="cd-card"
-              data-top={isTop ? "1" : "0"}
-              data-drag={o?.mode === "drag" ? "1" : "0"}
-              data-fly={o?.mode === "fly" ? "1" : "0"}
-              data-snap={o?.mode === "snap" ? "1" : "0"}
-              style={{
-                transform,
-                zIndex: o ? n + 1 : n - depth,
-                opacity: o ? 1 : p.opacity,
-                filter: o || isTop ? "none" : "brightness(" + p.shade + ")",
-              }}
-              aria-hidden={isTop ? undefined : true}
-              onPointerDown={isTop ? onDown : undefined}
-              onPointerMove={isTop ? onMove : undefined}
-              onPointerUp={isTop ? onUp : undefined}
-              onPointerCancel={isTop ? onCancel : undefined}
-            >
-              {sl.image && !failed[i] ? (
-                // next/image sirve la captura en WebP/AVIF y al tamaño que corresponde,
-                // así los PNG originales de /public nunca se descargan completos.
-                <Image
-                  data-i={i}
-                  src={sl.image}
-                  alt={isTop ? sl.alt || sl.title : ""}
-                  fill
-                  sizes="(max-width: 640px) 78vw, 400px"
-                  quality={75}
-                  draggable={false}
-                  onError={() => markFailed(i)}
-                />
-              ) : (
-                <div className="cd-fallback" aria-hidden="true">
-                  <strong>{sl.title}</strong>
-                  <span>Imagen en preparación</span>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="cd-meta">
-        {/* Todos los textos comparten la misma celda: el alto lo marca el más largo y nada se corta ni salta */}
-        <div className="cd-cap">
-          {slides.map((sl, i) => (
-            <div
-              key={i}
-              className="cd-cap-item"
-              data-on={i === top ? "1" : "0"}
-              aria-hidden={i === top ? undefined : true}
-            >
-              <h3 className="cd-title">{sl.title}</h3>
-              {sl.caption ? <p className="cd-sub">{sl.caption}</p> : null}
-            </div>
-          ))}
-        </div>
-
-        <div className="cd-nav">
-          <button
-            type="button"
-            className="cd-btn"
-            aria-label="Demo anterior"
-            onClick={() => {
-              lastTouch.current = performance.now();
-              pullBack();
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M10 3 5 8l5 5" stroke="currentColor" strokeWidth="1.4" />
-            </svg>
-          </button>
-          <span className="cd-count" aria-hidden="true">
-            <b>{pad2(top + 1)}</b> / {pad2(n)}
-          </span>
-          <button
-            type="button"
-            className="cd-btn"
-            aria-label="Demo siguiente"
-            onClick={() => {
-              lastTouch.current = performance.now();
-              throwTop(1);
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="m6 3 5 5-5 5" stroke="currentColor" strokeWidth="1.4" />
-            </svg>
-          </button>
-        </div>
-
-        {s.href ? (
-          <div className="cd-demo">
-            <MagneticWrap>
-              <OriginButton
-                variant="outline"
-                aria-label={`Ver la demo de ${s.title} (se abre en una pestaña nueva)`}
-                onClick={() => {
-                  track("demo_click", { demo: s.title });
-                  window.open(s.href, "_blank", "noopener,noreferrer");
-                }}
-              >
-                Ver demo ↗
-              </OriginButton>
-            </MagneticWrap>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="cd-sr" aria-live="polite">
-        {"Demo " + (top + 1) + " de " + n + (s.title ? ": " + s.title : "")}
-      </div>
-    </div>
-  );
-};
 
 /* ============================================================
    SECCIONES
@@ -3343,6 +2776,34 @@ const AnimatedWaveFooter: React.FC = () => {
                 <p>Argentina</p>
               </address>
             </div>
+            <div className="col-span-2">
+              <h3 className="mb-4 text-lg font-semibold text-zinc-50">
+                Redes y correo
+              </h3>
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-300">
+                <a
+                  href={INSTAGRAM_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="VisoTech en Instagram (se abre en una pestaña nueva)"
+                  className={footerLink}
+                >
+                  Instagram
+                </a>
+                <a
+                  href={FACEBOOK_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="VisoTech en Facebook (se abre en una pestaña nueva)"
+                  className={footerLink}
+                >
+                  Facebook
+                </a>
+                <a href={"mailto:" + EMAIL} className={footerLink}>
+                  {EMAIL}
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -3374,13 +2835,20 @@ export default function Page() {
     ).connection;
     if (connection?.saveData) return;
 
-    const start = () => setShowMist(true);
-    if (typeof window.requestIdleCallback === "function") {
-      const id = window.requestIdleCallback(start, { timeout: 1500 });
-      return () => window.cancelIdleCallback(id);
+    // El fondo queda tapado por el Hero: solo se dibuja cuando "Servicios"
+    // está por entrar en pantalla (o ya quedó arriba). Así no gasta GPU de balde.
+    const target = document.getElementById("servicios");
+    if (!target || typeof IntersectionObserver === "undefined") {
+      setShowMist(true);
+      return;
     }
-    const id = window.setTimeout(start, 800);
-    return () => window.clearTimeout(id);
+    const io = new IntersectionObserver(
+      ([entry]) =>
+        setShowMist(entry.isIntersecting || entry.boundingClientRect.top < 0),
+      { rootMargin: "300px 0px 300px 0px" },
+    );
+    io.observe(target);
+    return () => io.disconnect();
   }, []);
 
   // Medición de conversiones en GA4 (solo envía si Analytics está cargado):
@@ -3444,7 +2912,7 @@ export default function Page() {
             </div>
           </div>
 
-          <MinimalistDock />
+          <SiteMenu />
         </div>
       </StaticCursor>
     </MotionConfig>
