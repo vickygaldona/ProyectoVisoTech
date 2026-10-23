@@ -1924,6 +1924,14 @@ type Plan = {
   needs: string[];
 };
 
+type Plan = {
+  // ...lo que ya tiene...
+  pdf?: string;
+  /** Precio de referencia que se muestra en la tarjeta */
+  price: string;
+  needs: string[];
+};
+
 const PLANS: Plan[] = [
   {
     id: "landing",
@@ -1943,6 +1951,7 @@ const PLANS: Plan[] = [
     featured: true,
     span: "md:col-span-4",
     pdf: "/propuestas/01-Landing-page-para-negocios.pdf",
+    price: "$250.000",
     needs: ["negocio"],
   },
   {
@@ -1959,6 +1968,7 @@ const PLANS: Plan[] = [
     topic: "una invitación digital para un evento",
     span: "md:col-span-2",
     pdf: "/propuestas/02-Invitacion-digital-para-eventos.pdf",
+    price: "Desde $15.000",
     needs: ["evento", "confirmar"],
   },
   {
@@ -1977,6 +1987,7 @@ const PLANS: Plan[] = [
     topic: "una carta o catálogo digital",
     span: "md:col-span-2",
     pdf: "/propuestas/03-Carta-o-catalogo-digital.pdf",
+    price: "$180.000",
     needs: ["productos"],
   },
   {
@@ -1993,6 +2004,7 @@ const PLANS: Plan[] = [
     topic: "un portfolio o sitio profesional",
     span: "md:col-span-2",
     pdf: "/propuestas/04-Portfolio-o-sitio-profesional.pdf",
+    price: "$350.000",
     needs: ["negocio", "trabajos"],
   },
   {
@@ -2009,6 +2021,7 @@ const PLANS: Plan[] = [
     topic: "una tarjeta digital con QR",
     span: "md:col-span-2",
     pdf: "/propuestas/05-Tarjeta-digital-con-QR.pdf",
+    price: "$40.000",
     needs: ["qr"],
   },
   {
@@ -2026,6 +2039,7 @@ const PLANS: Plan[] = [
     topic: "una landing para un curso o capacitación",
     span: "md:col-span-2",
     pdf: "/propuestas/06-Landing-para-cursos-y-capacitaciones.pdf",
+    price: "$300.000",
     needs: ["curso", "negocio"],
   },
   {
@@ -2043,6 +2057,7 @@ const PLANS: Plan[] = [
     topic: "un catálogo con carrito a WhatsApp",
     span: "md:col-span-2",
     pdf: "/propuestas/07-Catalogo-con-carrito-a-WhatsApp.pdf",
+    price: "$300.000",
     needs: ["productos", "pedidos"],
   },
   {
@@ -2059,6 +2074,7 @@ const PLANS: Plan[] = [
     topic: "una web de evento o lanzamiento",
     span: "md:col-span-2",
     pdf: "/propuestas/08-Web-de-evento-o-lanzamiento.pdf",
+    price: "$300.000",
     needs: ["evento", "cuenta", "confirmar"],
   },
   {
@@ -2075,6 +2091,7 @@ const PLANS: Plan[] = [
     topic: "una galería o lookbook",
     span: "md:col-span-2",
     pdf: "/propuestas/09-Galeria-o-lookbook.pdf",
+    price: "$220.000",
     needs: ["trabajos"],
   },
   {
@@ -2092,6 +2109,7 @@ const PLANS: Plan[] = [
     topic: "fichas de propiedades para una inmobiliaria",
     span: "md:col-span-2",
     pdf: "/propuestas/10-Fichas-de-propiedades.pdf",
+    price: "$200.000",
     needs: ["propiedades"],
   },
   {
@@ -2109,6 +2127,7 @@ const PLANS: Plan[] = [
     topic: "un rediseño visual de mi web",
     span: "md:col-span-2",
     pdf: "/propuestas/11-Rediseno-visual-de-tu-web.pdf",
+    price: "$280.000",
     needs: ["rediseno"],
   },
 ];
@@ -2214,7 +2233,7 @@ const PlanCard: React.FC<{ plan: Plan; variant?: "grid" | "slide" }> = ({
         ) : null}
       </div>
 
-      <div className="relative mt-auto border-t border-white/10 pt-5">
+      <div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-3">
         {plan.pdf ? (
           <a
             href={plan.pdf}
@@ -2222,7 +2241,7 @@ const PlanCard: React.FC<{ plan: Plan; variant?: "grid" | "slide" }> = ({
             rel="noopener noreferrer"
             aria-label={`Ver la propuesta de ${plan.title} en PDF (se abre en una pestaña nueva)`}
             className={cn(
-              "mb-5 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-neutral-950 transition-colors hover:bg-zinc-200",
+              "inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-neutral-950 transition-colors hover:bg-zinc-200",
               focusRing,
             )}
           >
@@ -2230,6 +2249,13 @@ const PlanCard: React.FC<{ plan: Plan; variant?: "grid" | "slide" }> = ({
             Ver propuesta
           </a>
         ) : null}
+        <p className="leading-tight">
+          <span className="block text-xs uppercase tracking-wide text-zinc-300">
+            Precio
+          </span>
+          <span className="text-xl font-semibold text-zinc-50">{plan.price}</span>
+        </p>
+      </div>
         <button
           type="button"
           aria-expanded={open}
@@ -2261,10 +2287,10 @@ const PlanCard: React.FC<{ plan: Plan; variant?: "grid" | "slide" }> = ({
               />
             ))}
           </div>
-        ) : null}
-      </div>
+        ) : null
+        }
     </article>
-  );
+    );
 };
 
 /* ---------- Carrusel 3D (coverflow) de planes ---------- */
@@ -2790,8 +2816,8 @@ const ServicesGrid: React.FC = () => (
           Elegí el proyecto que necesitás
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-base text-zinc-300">
-          El precio depende de cada proyecto. Escribinos por WhatsApp y te
-          armamos un presupuesto.
+          Los precios son de referencia y pueden variar según el alcance de cada
+          proyecto. Escribinos por WhatsApp y te armamos un presupuesto.
         </p>
         <p className="mx-auto mt-3 max-w-xl text-sm text-zinc-400">
           Deslizá las tarjetas o usá las flechas para ver todos los proyectos.
