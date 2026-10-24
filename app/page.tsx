@@ -387,6 +387,16 @@ interface StaticCursorProps {
   disableOnTouch?: boolean;
 }
 
+const TOUCH_QUERY = "(hover: none), (pointer: coarse)";
+
+function subscribeTouch(callback: () => void) {
+  const mq = window.matchMedia(TOUCH_QUERY);
+  mq.addEventListener("change", callback);
+  return () => mq.removeEventListener("change", callback);
+}
+const getTouch = () => window.matchMedia(TOUCH_QUERY).matches;
+const getServerTouch = () => true; // en el servidor no se dibuja el cursor
+
 const StaticCursor: React.FC<StaticCursorProps> = ({
   children,
   variant = "ring",
@@ -396,12 +406,8 @@ const StaticCursor: React.FC<StaticCursorProps> = ({
   disableOnTouch = true,
 }) => {
   const cursorRef = React.useRef<HTMLDivElement>(null);
-  const [active, setActive] = React.useState(false);
-
-  React.useEffect(() => {
-    const isTouch = window.matchMedia("(hover: none), (pointer: coarse)").matches;
-    setActive(!(disableOnTouch && isTouch));
-  }, [disableOnTouch]);
+  const isTouch = React.useSyncExternalStore(subscribeTouch, getTouch, getServerTouch);
+  const active = !(disableOnTouch && isTouch);
 
   React.useEffect(() => {
     if (!active) return;
@@ -503,12 +509,12 @@ type OriginButtonProps = ButtonNativeProps & {
 function getCoverDiameter(width: number, height: number, x: number, y: number) {
   return Math.ceil(
     2 *
-      Math.max(
-        Math.hypot(x, y),
-        Math.hypot(width - x, y),
-        Math.hypot(x, height - y),
-        Math.hypot(width - x, height - y),
-      ),
+    Math.max(
+      Math.hypot(x, y),
+      Math.hypot(width - x, y),
+      Math.hypot(x, height - y),
+      Math.hypot(width - x, height - y),
+    ),
   );
 }
 
@@ -772,6 +778,23 @@ interface AuroraBackgroundProps {
 
 type Star = { x: number; y: number; peak: number; dur: number; delay: number };
 
+/** Estrellas con valores fijos: servidor y navegador generan lo mismo (sin errores de hidratación). */
+function makeStars(count: number): Star[] {
+  let seed = 1337;
+  const rand = () => {
+    seed = (seed * 16807) % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  return Array.from({ length: count }, () => ({
+    x: r2(rand() * 100),
+    y: r2(rand() * 100),
+    peak: 0.25 + rand() * 0.6,
+    dur: rand() * 3 + 2,
+    delay: rand() * 5,
+  }));
+}
+
 const AuroraBackground: React.FC<AuroraBackgroundProps> = ({
   className = "",
   children,
@@ -783,20 +806,8 @@ const AuroraBackground: React.FC<AuroraBackgroundProps> = ({
   pulseDuration = 10,
 }) => {
   const [colorA, colorB] = gradientColors;
-  const [stars, setStars] = React.useState<Star[]>([]);
   const [rootRef, inView] = useInView<HTMLDivElement>();
-
-  React.useEffect(() => {
-    setStars(
-      Array.from({ length: starCount }).map(() => ({
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        peak: 0.25 + Math.random() * 0.6,
-        dur: Math.random() * 3 + 2,
-        delay: Math.random() * 5,
-      })),
-    );
-  }, [starCount]);
+  const stars = React.useMemo(() => makeStars(starCount), [starCount]);
 
   return (
     <div
@@ -1355,14 +1366,9 @@ type Plan = {
   pdf?: string;
   /** Necesidades que cubre (ids de FINDER_NEEDS) */
   needs: string[];
-};
-
-type Plan = {
-  // ...lo que ya tiene...
-  pdf?: string;
   /** Precio de referencia que se muestra en la tarjeta */
   price: string;
-  needs: string[];
+
 };
 
 const PLANS: Plan[] = [
@@ -1608,7 +1614,7 @@ const PlanCard: React.FC<{ plan: Plan; variant?: "grid" | "slide" }> = ({
       className={cn(
         variant === "slide" ? slideCard : cn(planCard, plan.span),
         plan.featured &&
-          "border-cyan-300/30 shadow-[0_0_60px_-15px_rgba(34,211,238,0.45)] hover:border-cyan-300/50",
+        "border-cyan-300/30 shadow-[0_0_60px_-15px_rgba(34,211,238,0.45)] hover:border-cyan-300/50",
       )}
     >
       {plan.featured ? (
@@ -1666,29 +1672,31 @@ const PlanCard: React.FC<{ plan: Plan; variant?: "grid" | "slide" }> = ({
         ) : null}
       </div>
 
-      <div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-3">
-        {plan.pdf ? (
-          <a
-            href={plan.pdf}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`Ver la propuesta de ${plan.title} en PDF (se abre en una pestaña nueva)`}
-            className={cn(
-              "inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-neutral-950 transition-colors hover:bg-zinc-200",
-              focusRing,
-            )}
-          >
-            <FileText size={16} aria-hidden="true" />
-            Ver propuesta
-          </a>
-        ) : null}
-        <p className="leading-tight">
-          <span className="block text-xs uppercase tracking-wide text-zinc-300">
-            Precio
-          </span>
-          <span className="text-xl font-semibold text-zinc-50">{plan.price}</span>
-        </p>
-      </div>
+      <div className="relative mt-auto border-t border-white/10 pt-5">
+        <div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-3">
+          {plan.pdf ? (
+            <a
+              href={plan.pdf}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Ver la propuesta de ${plan.title} en PDF (se abre en una pestaña nueva)`}
+              className={cn(
+                "inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-medium text-neutral-950 transition-colors hover:bg-zinc-200",
+                focusRing,
+              )}
+            >
+              <FileText size={16} aria-hidden="true" />
+              Ver propuesta
+            </a>
+          ) : null}
+          <p className="leading-tight">
+            <span className="block text-xs uppercase tracking-wide text-zinc-300">
+              Precio
+            </span>
+            <span className="text-xl font-semibold text-zinc-50">{plan.price}</span>
+          </p>
+        </div>
+
         <button
           type="button"
           aria-expanded={open}
@@ -1720,10 +1728,10 @@ const PlanCard: React.FC<{ plan: Plan; variant?: "grid" | "slide" }> = ({
               />
             ))}
           </div>
-        ) : null
-        }
+        ) : null}
+      </div>
     </article>
-    );
+  );
 };
 
 /* ---------- Carrusel 3D (coverflow) de planes ---------- */
@@ -2083,10 +2091,10 @@ const PlanFinder: React.FC = () => {
   // Proyectos que cubren todo lo marcado; primero los más específicos (los que incluyen menos cosas).
   const results = selectedNeeds.length
     ? PLANS.filter((plan) =>
-        selectedNeeds.every((need) => plan.needs.includes(need.id)),
-      )
-        .sort((a, b) => a.needs.length - b.needs.length)
-        .slice(0, 3)
+      selectedNeeds.every((need) => plan.needs.includes(need.id)),
+    )
+      .sort((a, b) => a.needs.length - b.needs.length)
+      .slice(0, 3)
     : [];
 
   const noMatch = selectedNeeds.length > 0 && results.length === 0;
@@ -2216,11 +2224,10 @@ const PlanFinder: React.FC = () => {
                   key={contact.id}
                   contact={contact}
                   topic={topic}
-                  ariaLabel={`Escribir a ${contact.name} por WhatsApp para consultar el presupuesto de ${
-                    results.length
-                      ? results.map((plan) => plan.title).join(" o ")
-                      : "un proyecto combinado"
-                  }`}
+                  ariaLabel={`Escribir a ${contact.name} por WhatsApp para consultar el presupuesto de ${results.length
+                    ? results.map((plan) => plan.title).join(" o ")
+                    : "un proyecto combinado"
+                    }`}
                 />
               ))}
             </div>
