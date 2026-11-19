@@ -38,12 +38,18 @@ import {
   Images,
   Building2,
   Paintbrush,
+  ClipboardList,
+  PenTool,
+  PackageCheck,
+  Quote,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 import { CircleMenu, type CircleMenuItem } from "./components/ui/circle-menu";
 import { EMAIL, FACEBOOK_URL, INSTAGRAM_URL } from "./site-links";
+import { FAQ } from "./data/faq";
+import { TESTIMONIALS } from "./data/testimonials";
 
 /* ============================================================
    CONTACTOS Y HELPERS GLOBALES
@@ -58,6 +64,8 @@ type Contact = {
   number: string;
   graduate: string;
   initial: string;
+  /** Foto en public/ (por ejemplo "/equipo/santiago.webp"). Si falta, se muestra la inicial. */
+  photo?: string;
 };
 
 const CONTACTS: readonly Contact[] = [
@@ -67,6 +75,8 @@ const CONTACTS: readonly Contact[] = [
     number: "5492625649736",
     graduate: "Egresado",
     initial: "S",
+    // COMPLETAR: subir la foto a public/equipo/santiago.webp y descomentar:
+    // photo: "/equipo/santiago.webp",
   },
   {
     id: "victoria",
@@ -74,6 +84,8 @@ const CONTACTS: readonly Contact[] = [
     number: "5492604811080",
     graduate: "Egresada",
     initial: "V",
+    // COMPLETAR: subir la foto a public/equipo/victoria.webp y descomentar:
+    // photo: "/equipo/victoria.webp",
   },
 ];
 
@@ -1335,6 +1347,17 @@ const Hero: React.FC = () => {
       <AuroraBackground starCount={lite ? 8 : 24} pulseDuration={8} className="px-4 py-28">
         <motion.div style={{ opacity: fade }} className="w-full">
           <AnimatedGroup className="mx-auto flex max-w-3xl flex-col items-center text-center">
+            <div className="mb-6 flex items-center gap-3">
+              <Image
+                src="/logo.webp"
+                alt=""
+                width={44}
+                height={44}
+                priority
+                className="rounded-xl"
+              />
+              <span className="text-xl font-semibold tracking-tight text-zinc-50">VisoTech</span>
+            </div>
             <motion.div style={{ y: yTitle }}>
               <h1
                 id="hero-titulo"
@@ -2589,6 +2612,175 @@ const Portfolio: React.FC = () => {
   );
 };
 
+/* ---------- Cómo trabajamos ---------- */
+
+const HOW_STEPS = [
+  {
+    icon: <MessageCircle size={22} aria-hidden="true" />,
+    title: "Consulta",
+    text: "Nos escribís por WhatsApp y nos contás qué necesitás.",
+  },
+  {
+    icon: <ClipboardList size={22} aria-hidden="true" />,
+    title: "Presupuesto",
+    text: "Armamos un presupuesto a medida de tu proyecto.",
+  },
+  {
+    icon: <PenTool size={22} aria-hidden="true" />,
+    title: "Diseño y desarrollo",
+    text: "Diseñamos y programamos tu sitio con la identidad de tu negocio o evento.",
+  },
+  {
+    icon: <PackageCheck size={22} aria-hidden="true" />,
+    title: "Entrega",
+    text: "Revisamos juntos el resultado y dejamos la web lista para usar.",
+  },
+] as const;
+
+const HowWeWork: React.FC = () => (
+  <section
+    id="como-trabajamos"
+    aria-labelledby="como-titulo"
+    className="relative px-4 py-24 md:px-8"
+  >
+    <div className="mx-auto max-w-6xl">
+      <div className="mb-12 text-center">
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300">
+          Cómo trabajamos
+        </p>
+        <h2
+          id="como-titulo"
+          className="mt-3 text-3xl font-bold tracking-tight text-balance text-zinc-50 md:text-5xl"
+        >
+          Del primer mensaje a tu web lista
+        </h2>
+        <p className="mx-auto mt-4 max-w-xl text-base text-zinc-300">
+          Cuatro pasos simples. Los plazos los coordinamos con vos según el
+          alcance de tu proyecto.
+        </p>
+      </div>
+
+      <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {HOW_STEPS.map((step, i) => (
+          <li
+            key={step.title}
+            className="rounded-3xl border border-white/10 bg-white/[0.04] p-6"
+          >
+            <div className="flex items-center justify-between">
+              <span
+                aria-hidden="true"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-cyan-300/10 text-cyan-300 ring-1 ring-cyan-300/30"
+              >
+                {step.icon}
+              </span>
+              <span aria-hidden="true" className="text-sm font-semibold text-zinc-400">
+                {pad2(i + 1)}
+              </span>
+            </div>
+            <h3 className="mt-5 text-lg font-semibold tracking-tight text-zinc-50">
+              <span className="sr-only">Paso {i + 1}: </span>
+              {step.title}
+            </h3>
+            <p className="mt-2 text-base leading-relaxed text-zinc-300">{step.text}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+);
+
+/* ---------- Testimonios (solo se muestra si hay testimonios reales en app/data/testimonials.ts) ---------- */
+
+const Testimonials: React.FC = () => {
+  if (TESTIMONIALS.length === 0) return null;
+  return (
+    <section
+      id="testimonios"
+      aria-labelledby="testimonios-titulo"
+      className="relative px-4 py-24 md:px-8"
+    >
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-12 text-center">
+          <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300">
+            Testimonios
+          </p>
+          <h2
+            id="testimonios-titulo"
+            className="mt-3 text-3xl font-bold tracking-tight text-balance text-zinc-50 md:text-5xl"
+          >
+            Lo que dicen nuestros clientes
+          </h2>
+        </div>
+        <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {TESTIMONIALS.map((t) => (
+            <li key={t.name + t.business}>
+              <figure className="h-full rounded-3xl border border-white/10 bg-white/[0.04] p-6">
+                <Quote size={22} aria-hidden="true" className="text-cyan-300" />
+                <blockquote className="mt-4 text-base leading-relaxed text-zinc-200">
+                  {t.quote}
+                </blockquote>
+                <figcaption className="mt-5 text-sm text-zinc-400">
+                  <span className="font-medium text-zinc-50">{t.name}</span>
+                  {" · "}
+                  {t.business}
+                </figcaption>
+              </figure>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+};
+
+/* ---------- Preguntas frecuentes (el contenido está en app/data/faq.ts) ---------- */
+
+const FaqSection: React.FC = () => (
+  <section
+    id="preguntas"
+    aria-labelledby="preguntas-titulo"
+    className="relative px-4 py-24 md:px-8"
+  >
+    <div className="mx-auto max-w-3xl">
+      <div className="text-center">
+        <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-300">
+          Preguntas frecuentes
+        </p>
+        <h2
+          id="preguntas-titulo"
+          className="mt-3 text-3xl font-bold tracking-tight text-balance text-zinc-50 md:text-5xl"
+        >
+          Lo que más nos preguntan
+        </h2>
+      </div>
+
+      <div className="mt-10 space-y-3">
+        {FAQ.map((item) => (
+          <details
+            key={item.question}
+            className="group rounded-2xl border border-white/10 bg-white/[0.04] open:bg-white/[0.07]"
+          >
+            <summary
+              className={cn(
+                "flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left text-base font-medium text-zinc-50 [&::-webkit-details-marker]:hidden",
+                focusRing,
+              )}
+            >
+              {item.question}
+              <ChevronDown
+                size={18}
+                aria-hidden="true"
+                className="shrink-0 text-cyan-300 transition-transform group-open:rotate-180"
+              />
+            </summary>
+            <p className="px-5 pb-5 text-base leading-relaxed text-zinc-300">{item.answer}</p>
+          </details>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
 /* ---------- Quiénes somos ---------- */
 
 const AboutUs: React.FC = () => (
@@ -2644,12 +2836,22 @@ const AboutUs: React.FC = () => (
                 {person.graduate} de la UTN San Rafael
               </p>
               <div className="flex items-center gap-5">
-                <span
-                  aria-hidden="true"
-                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/5 text-2xl font-semibold text-zinc-50 ring-2 ring-white/10"
-                >
-                  {person.initial}
-                </span>
+                {person.photo ? (
+                  <Image
+                    src={person.photo}
+                    alt={`Foto de ${person.name}`}
+                    width={56}
+                    height={56}
+                    className="h-14 w-14 shrink-0 rounded-full object-cover ring-2 ring-white/10"
+                  />
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/5 text-2xl font-semibold text-zinc-50 ring-2 ring-white/10"
+                  >
+                    {person.initial}
+                  </span>
+                )}
                 <div className="min-w-0">
                   <h3 className="text-xl font-semibold tracking-tight text-zinc-50 sm:text-2xl">
                     {person.name}
@@ -2937,8 +3139,11 @@ export default function Page() {
               <main id="contenido">
                 <Hero />
                 <ServicesGrid />
+                <HowWeWork />
                 <Portfolio />
+                <Testimonials />
                 <AboutUs />
+                <FaqSection />
                 <ContactForm />
               </main>
               <AnimatedWaveFooter />

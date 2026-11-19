@@ -16,11 +16,11 @@ Si falta un dato (precios, fotos, testimonios, etc.), dejar un texto de ejemplo 
 - [x] 6. Plan B por mail (mailto prellenado) y simplificar el anti-spam
 
 ## D. Contenido nuevo (datos de ejemplo con COMPLETAR)
-- [ ] 7. Sección "Cómo trabajamos" (4 pasos)
-- [ ] 8. Preguntas frecuentes (acordeón accesible)
-- [ ] 9. Testimonios (3 tarjetas de ejemplo)
-- [ ] 10. Fotos de Victoria y Santiago en "Quiénes somos"
-- [ ] 11. Logo de VisoTech en menú/hero
+- [x] 7. Sección "Cómo trabajamos" (4 pasos, con el texto de sus propios PDFs)
+- [x] 8. Preguntas frecuentes (acordeón accesible; contenido en app/data/faq.ts, solo con datos de los PDFs)
+- [x] 9. Testimonios: sección lista, se muestra sola cuando carguen testimonios reales en app/data/testimonials.ts
+- [x] 10. Fotos en "Quiénes somos": listo para usar; falta subir public/equipo/santiago.webp y victoria.webp y descomentar `photo` en CONTACTS
+- [x] 11. Logo de VisoTech en el hero (public/logo.webp, sale del ícono de la pestaña)
 
 ## E. Portfolio
 - [ ] 12. Video o GIF opcional por demo (campo `video` en DEMO_SLIDES)
@@ -38,5 +38,7 @@ Si falta un dato (precios, fotos, testimonios, etc.), dejar un texto de ejemplo 
 - [ ] Perfil de Google Business
 - [ ] Plan mensual (hosting, dominio, cambios chicos)
 - [ ] Reducir los 11 servicios a 3 o 4
-- [ ] Juntar testimonios y fotos
+- [ ] Juntar testimonios reales (con permiso del cliente) y cargarlos en app/data/testimonials.ts
+- [ ] Sacar y subir las fotos de ustedes (public/equipo/)
+- [ ] Decidir y escribir las respuestas que faltan del FAQ (hosting y dominio, seña y pagos, rondas de cambios, mantenimiento); están listadas al final de app/data/faq.ts
 - [ ] Anotar horas por proyecto y cuánto se cobró
