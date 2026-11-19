@@ -2,7 +2,7 @@
 
 // Dependencias: npm i lucide-react framer-motion @next/third-parties
 // Requiere: Next.js (App Router) + TypeScript + Tailwind CSS 4
-// Imágenes del portfolio: public/imagen1.png ... public/imagen5.png
+// Imágenes del portfolio: public/imagen1.webp ... public/imagen5.webp
 
 import Image from "next/image";
 import Link from "next/link";
@@ -387,15 +387,45 @@ interface StaticCursorProps {
   disableOnTouch?: boolean;
 }
 
-const TOUCH_QUERY = "(hover: none), (pointer: coarse)";
+/* ---------- Modo liviano ----------
+   Celulares y equipos con pocos recursos reciben una versión más liviana:
+   sin niebla WebGL, menos estrellas y sin cursor personalizado.
+   En una compu de escritorio normal, todo queda igual. */
 
-function subscribeTouch(callback: () => void) {
-  const mq = window.matchMedia(TOUCH_QUERY);
-  mq.addEventListener("change", callback);
-  return () => mq.removeEventListener("change", callback);
+const TOUCH_QUERY = "(hover: none), (pointer: coarse)";
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function subscribeLite(callback: () => void) {
+  const queries = [
+    window.matchMedia(TOUCH_QUERY),
+    window.matchMedia(REDUCED_MOTION_QUERY),
+  ];
+  queries.forEach((mq) => mq.addEventListener("change", callback));
+  return () => queries.forEach((mq) => mq.removeEventListener("change", callback));
 }
-const getTouch = () => window.matchMedia(TOUCH_QUERY).matches;
-const getServerTouch = () => true; // en el servidor no se dibuja el cursor
+
+const getLite = () => {
+  // Pantalla táctil o "reducir movimiento" activado
+  if (window.matchMedia(TOUCH_QUERY).matches) return true;
+  if (window.matchMedia(REDUCED_MOTION_QUERY).matches) return true;
+  const nav = navigator as Navigator & {
+    deviceMemory?: number;
+    connection?: { saveData?: boolean };
+  };
+  // "Ahorro de datos" activado
+  if (nav.connection?.saveData) return true;
+  // Equipo con muy pocos núcleos (2 o menos) o poca memoria (2 GB o menos)
+  if (typeof nav.hardwareConcurrency === "number" && nav.hardwareConcurrency <= 2) return true;
+  if (typeof nav.deviceMemory === "number" && nav.deviceMemory <= 2) return true;
+  return false;
+};
+
+// En el servidor se asume modo liviano: el navegador lo corrige al cargar.
+const getServerLite = () => true;
+
+function useLiteMode() {
+  return React.useSyncExternalStore(subscribeLite, getLite, getServerLite);
+}
 
 const StaticCursor: React.FC<StaticCursorProps> = ({
   children,
@@ -406,8 +436,8 @@ const StaticCursor: React.FC<StaticCursorProps> = ({
   disableOnTouch = true,
 }) => {
   const cursorRef = React.useRef<HTMLDivElement>(null);
-  const isTouch = React.useSyncExternalStore(subscribeTouch, getTouch, getServerTouch);
-  const active = !(disableOnTouch && isTouch);
+  const lite = useLiteMode();
+  const active = !(disableOnTouch && lite);
 
   React.useEffect(() => {
     if (!active) return;
@@ -1247,35 +1277,35 @@ function pad2(n: number): string {
 /** Imágenes locales: colocá tus capturas en /public con estos nombres. */
 const DEMO_SLIDES: Slide[] = [
   {
-    image: "/imagen1.png",
+    image: "/imagen1.webp",
     href: "https://carolinagarcia.com.ar",
     title: "Carnet de Manipulación de Alimentos",
     caption: "Landing de un curso de certificación en San Rafael.",
     alt: "Captura de la landing del Carnet de Manipulación de Alimentos",
   },
   {
-    image: "/imagen2.png",
+    image: "/imagen2.webp",
     href: "https://www.carolinagarcia.com.ar",
     title: "Carolina García",
     caption: "Sitio web profesional.",
     alt: "Captura del sitio web de Carolina García",
   },
   {
-    image: "/imagen3.png",
+    image: "/imagen3.webp",
     href: "https://danger-fitness-web.netlify.app",
     title: "Danger Fitness",
     caption: "Sitio web de entrenamiento.",
     alt: "Captura del sitio web de Danger Fitness",
   },
   {
-    image: "/imagen4.png",
+    image: "/imagen4.webp",
     href: "https://bautismo-lian.netlify.app",
     title: "Invitación de Bautismo",
     caption: "Invitación digital para eventos.",
     alt: "Captura de la invitación digital de bautismo",
   },
   {
-    image: "/imagen5.png",
+    image: "/imagen5.webp",
     href: "https://vivero-el-paraiso.netlify.app",
     title: "Vivero El Paraíso",
     caption: "Sitio web con catálogo de plantas de vid y frutos secos.",
@@ -1290,6 +1320,7 @@ const DEMO_SLIDES: Slide[] = [
 const Hero: React.FC = () => {
   const ref = React.useRef<HTMLElement>(null);
   const reduce = useReducedMotion();
+  const lite = useLiteMode();
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start start", "end start"],
@@ -1305,7 +1336,7 @@ const Hero: React.FC = () => {
 
   return (
     <section ref={ref} id="inicio" aria-labelledby="hero-titulo">
-      <AuroraBackground starCount={24} pulseDuration={8} className="px-4 py-28">
+      <AuroraBackground starCount={lite ? 8 : 24} pulseDuration={8} className="px-4 py-28">
         <motion.div style={{ opacity: fade }} className="w-full">
           <AnimatedGroup className="mx-auto flex max-w-3xl flex-col items-center text-center">
             <motion.div style={{ y: yTitle }}>
@@ -2832,15 +2863,14 @@ const AnimatedWaveFooter: React.FC = () => {
 
 export default function Page() {
   const [showMist, setShowMist] = React.useState(false);
+  const lite = useLiteMode();
 
   // El shader WebGL es lo más pesado de la página: se monta recién cuando el
-  // navegador está libre, para no competir con el primer render. Con "ahorro de
-  // datos" activado directamente no se carga y queda el fondo negro.
+  // navegador está libre, para no competir con el primer render. En modo liviano
+  // (celulares, equipos lentos, "ahorro de datos" o "reducir movimiento")
+  // directamente no se carga y queda el fondo negro.
   React.useEffect(() => {
-    const connection = (
-      navigator as Navigator & { connection?: { saveData?: boolean } }
-    ).connection;
-    if (connection?.saveData) return;
+    if (lite) return;
 
     // El fondo queda tapado por el Hero: solo se dibuja cuando "Servicios"
     // está por entrar en pantalla (o ya quedó arriba). Así no gasta GPU de balde.
@@ -2856,7 +2886,7 @@ export default function Page() {
     );
     io.observe(target);
     return () => io.disconnect();
-  }, []);
+  }, [lite]);
 
   // Medición de conversiones en GA4 (solo envía si Analytics está cargado):
   // clicks a WhatsApp y a los PDF de propuestas.
@@ -2898,7 +2928,7 @@ export default function Page() {
               aria-hidden="true"
               className="pointer-events-none sticky top-0 z-0 -mb-[100svh] h-svh w-full overflow-hidden bg-black"
             >
-              {showMist ? (
+              {showMist && !lite ? (
                 <div className="vt-fade-in absolute inset-0">
                   <MistBackground speed={0.6} opacity={0.7} />
                 </div>
