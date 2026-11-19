@@ -1329,7 +1329,7 @@ const Hero: React.FC = () => {
             <motion.div style={{ y: yButtons }} className="flex flex-col items-center">
               <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <MagneticWrap>
-                  <OriginButton variant="solid" size="lg" onClick={() => goTo("contacto")}>
+                  <OriginButton variant="solid" size="lg" onClick={() => goTo("consulta")}>
                     Consultar presupuesto
                   </OriginButton>
                 </MagneticWrap>
@@ -2552,7 +2552,7 @@ const Portfolio: React.FC = () => {
             ¿Querés una web así para tu negocio o tu evento?
           </p>
           <MagneticWrap>
-            <OriginButton variant="solid" onClick={() => goTo("contacto")}>
+            <OriginButton variant="solid" onClick={() => goTo("consulta")}>
               Consultar presupuesto
             </OriginButton>
           </MagneticWrap>

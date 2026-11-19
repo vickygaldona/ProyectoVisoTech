@@ -1,4 +1,4 @@
----
+# VisoTech
 
 ## Sobre el proyecto
 
@@ -29,6 +29,29 @@ Cada servicio tiene su propuesta en PDF, disponible desde el sitio.
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Framer Motion](https://www.framer.com/motion/) para las animaciones
 - [Lucide](https://lucide.dev/) para los íconos
+
+### Cómo correr el proyecto
+
+Hace falta [Node.js](https://nodejs.org/) instalado.
+
+```bash
+npm install     # instala las dependencias (solo la primera vez)
+npm run dev     # abre el sitio en http://localhost:3000
+```
+
+Otros comandos útiles:
+
+```bash
+npm run lint    # revisa el código
+npm run build   # genera la versión de producción
+npm run start   # sirve esa versión (después de build)
+```
+
+**Google Analytics (opcional):** para medir visitas, creá un archivo `.env.local` en la raíz con tu ID de medición de GA4. Si no lo definís, Analytics simplemente no se carga.
+
+```
+NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
+```
 
 ## Quiénes somos
 
