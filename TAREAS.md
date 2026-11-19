@@ -13,7 +13,7 @@ Si falta un dato (precios, fotos, testimonios, etc.), dejar un texto de ejemplo 
 - [x] 5. En celulares/equipos de bajos recursos: sin niebla WebGL, menos estrellas, sin cursor ni botones magnéticos
 
 ## C. Formulario
-- [ ] 6. Plan B por mail (mailto prellenado) y simplificar el anti-spam
+- [x] 6. Plan B por mail (mailto prellenado) y simplificar el anti-spam
 
 ## D. Contenido nuevo (datos de ejemplo con COMPLETAR)
 - [ ] 7. Sección "Cómo trabajamos" (4 pasos)

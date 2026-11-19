@@ -7,7 +7,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import * as React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   motion,
   MotionConfig,
@@ -113,7 +113,10 @@ const cn = (...classes: Array<string | false | null | undefined>) =>
 
 const focusRing =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
-/* ---------- Formulario de consulta (validación + anti-spam) ---------- */
+/* ---------- Formulario de consulta ----------
+   No hay servidor: el formulario arma el mensaje y abre WhatsApp o el mail de la
+   persona, que lo envía desde su propia cuenta. Por eso no hace falta anti-spam
+   (campo trampa, tiempo mínimo, etc.): solo validamos que el mensaje tenga sentido. */
 
 const FORM_TOPICS = [
   "una landing page para mi negocio",
@@ -130,7 +133,7 @@ const FORM_TOPICS = [
   "otra cosa",
 ] as const;
 
-const MIN_FILL_MS = 3000;
+type SentVia = "whatsapp" | "email";
 
 const cleanText = (s: string) => s.replace(/\p{Cc}+/gu, " ").replace(/\s+/g, " ").trim();
 
@@ -143,8 +146,6 @@ const validateForm = (name: string, message: string): FormErrors => {
 
   if (message.length < 10) errors.message = "Contanos un poco más (mínimo 10 caracteres).";
   else if (message.length > 500) errors.message = "El mensaje es muy largo (máximo 500).";
-  else if (/https?:\/\/|www\./i.test(message))
-    errors.message = "Por seguridad, no se permiten links en el mensaje.";
   return errors;
 };
 
@@ -157,48 +158,39 @@ function ContactForm() {
   const [message, setMessage] = useState("");
   const [topic, setTopic] = useState<string>(FORM_TOPICS[0]);
   const [contactId, setContactId] = useState<ContactId>(CONTACTS[0].id);
-  const [website, setWebsite] = useState(""); // honeypot: las personas no lo ven
   const [submitted, setSubmitted] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [tooFast, setTooFast] = useState(false);
-  const startedAt = useRef(0);
-
-  useEffect(() => {
-    startedAt.current = Date.now();
-  }, []);
+  const [sent, setSent] = useState<SentVia | null>(null);
 
   const cleanName = cleanText(name);
   const cleanMessage = cleanText(message);
   const errors = submitted ? validateForm(cleanName, cleanMessage) : {};
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const send = (via: SentVia) => {
     setSubmitted(true);
-    setTooFast(false);
-
     if (Object.keys(validateForm(cleanName, cleanMessage)).length > 0) return;
 
-    // Anti-spam 1: si el campo trampa tiene algo, es un bot. Fingimos éxito y no hacemos nada.
-    if (website) {
-      setSent(true);
-      return;
+    if (via === "whatsapp") {
+      const { name: contactName, number } = getContact(contactId);
+      const text = `Hola ${contactName}! Soy ${cleanName}. Escribo desde la web de VisoTech. Quiero consultar por ${topic}. ${cleanMessage}`;
+      track("whatsapp_click", { contact: contactId, source: "form" });
+      track("form_submit", { channel: "whatsapp", contact: contactId });
+      window.open(
+        `https://wa.me/${number}?text=${encodeURIComponent(text)}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+    } else {
+      const subject = `Consulta desde la web: ${topic}`;
+      const body = `Hola! Soy ${cleanName}. Escribo desde la web de VisoTech.\n\nQuiero consultar por ${topic}.\n\n${cleanMessage}`;
+      track("form_submit", { channel: "email" });
+      window.location.href = `mailto:${EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     }
-    // Anti-spam 2: un humano tarda más de unos segundos en completarlo.
-    if (Date.now() - startedAt.current < MIN_FILL_MS) {
-      setTooFast(true);
-      return;
-    }
+    setSent(via);
+  };
 
-    const { name: contactName, number } = getContact(contactId);
-    const text = `Hola ${contactName}! Soy ${cleanName}. Escribo desde la web de VisoTech. Quiero consultar por ${topic}. ${cleanMessage}`;
-    track("whatsapp_click", { contact: contactId, source: "form" });
-    track("form_submit", { contact: contactId });
-    window.open(
-      `https://wa.me/${number}?text=${encodeURIComponent(text)}`,
-      "_blank",
-      "noopener,noreferrer",
-    );
-    setSent(true);
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    send("whatsapp"); // Enter dentro del formulario = enviar por WhatsApp
   };
 
   return (
@@ -211,16 +203,29 @@ function ContactForm() {
           Contanos qué necesitás
         </h2>
         <p className="mt-3 text-center text-zinc-300">
-          Completá el formulario y se abre WhatsApp con tu mensaje listo para enviar.
+          Completá el formulario y elegí cómo enviarlo: se abre WhatsApp o tu app de mail con el mensaje listo.
         </p>
 
         {sent ? (
           <div role="status" className="mt-8 rounded-2xl border border-cyan-300/30 bg-cyan-300/10 p-6 text-center text-zinc-50">
-            ¡Listo! Se abrió WhatsApp con tu consulta. Solo falta que toques enviar.
+            {sent === "whatsapp" ? (
+              <>¡Listo! Se abrió WhatsApp con tu consulta. Solo falta que toques enviar.</>
+            ) : (
+              <>
+                ¡Listo! Se abrió tu app de mail con la consulta. Solo falta que toques enviar.
+                <span className="mt-2 block text-sm text-zinc-300">
+                  Si no se abrió, escribinos a{" "}
+                  <a href={"mailto:" + EMAIL} className={cn("text-cyan-200 underline", focusRing)}>
+                    {EMAIL}
+                  </a>
+                  .
+                </span>
+              </>
+            )}
             <button
               type="button"
               onClick={() => {
-                setSent(false);
+                setSent(null);
                 setSubmitted(false);
                 setMessage("");
               }}
@@ -264,7 +269,7 @@ function ContactForm() {
 
             <div>
               <label htmlFor="cf-contact" className="mb-1.5 block text-sm font-medium text-zinc-200">
-                ¿Con quién querés hablar?
+                ¿Con quién querés hablar por WhatsApp?
               </label>
               <select
                 id="cf-contact"
@@ -298,25 +303,6 @@ function ContactForm() {
               </div>
             </div>
 
-            {/* Campo trampa: invisible para personas, los bots lo completan */}
-            <div aria-hidden="true" className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
-              <label htmlFor="cf-website">No completar este campo</label>
-              <input
-                id="cf-website"
-                type="text"
-                tabIndex={-1}
-                autoComplete="off"
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-              />
-            </div>
-
-            {tooFast ? (
-              <p role="alert" className="text-sm text-amber-300">
-                Esperá un par de segundos y volvé a tocar enviar.
-              </p>
-            ) : null}
-
             <button
               type="submit"
               className={cn(
@@ -325,6 +311,16 @@ function ContactForm() {
               )}
             >
               Enviar consulta por WhatsApp
+            </button>
+            <button
+              type="button"
+              onClick={() => send("email")}
+              className={cn(
+                "min-h-12 w-full rounded-xl border border-white/20 bg-transparent px-6 py-3 text-base font-semibold text-zinc-50 transition hover:bg-white/10",
+                focusRing,
+              )}
+            >
+              Enviar por mail
             </button>
           </form>
         )}
